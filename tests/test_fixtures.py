@@ -86,11 +86,25 @@ def test_gsec_master_has_coupon_dates():
 
 
 def test_gsec_trades_have_weighted_ytm():
-    """The YTM validation target in docs/03 §11 must actually be in the file."""
-    data = rows("trd1809_sett.csv")
-    assert data[0][-1] == "Weighted YTM"
-    assert data[0][4] == "Settl Days"
-    gs = [r for r in data[1:] if r and r[1] == "GS"]
-    assert gs, "no G-Sec rows to validate against"
-    assert all(r[4] == "1" for r in gs)  # G-Secs settle T+1
-    assert all(0 < float(r[12]) < 20 for r in gs)
+    """The YTM validation target in docs/03 §11 must actually be in the files.
+
+    All 28 daily settlement files are committed, not one, so the bond validation
+    in test_bonds.py has enough G-Sec prints to test a percentage against.
+    """
+    files = sorted((FIXTURES / "gsec_trades").glob("trd*_sett.csv"))
+    assert len(files) == 28
+
+    total_gsec = 0
+    for path in files:
+        with path.open(newline="") as fh:
+            data = [[c.strip() for c in r] for r in csv.reader(fh) if r]
+
+        assert data[0][-1] == "Weighted YTM"
+        assert data[0][4] == "Settl Days"
+
+        gs = [r for r in data[1:] if r and r[1] == "GS"]
+        total_gsec += len(gs)
+        assert all(r[4] == "1" for r in gs)  # G-Secs settle T+1
+        assert all(0 < float(r[12]) < 20 for r in gs)
+
+    assert total_gsec >= 100
