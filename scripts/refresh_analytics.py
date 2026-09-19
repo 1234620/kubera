@@ -12,6 +12,7 @@ import sys
 import time
 
 from slbdesk import db, queries
+from slbdesk import repo as repo_analytics
 from slbdesk.analytics import gsec
 
 
@@ -28,6 +29,14 @@ def main() -> int:
         affected = gsec.refresh(conn)
         conn.commit()
         print(f"  {'gsec analytics':22s} {affected:>9,} rows  {time.monotonic() - started:5.1f}s")
+
+        started = time.monotonic()
+        valued, calls, unvaluable = repo_analytics.refresh(conn)
+        conn.commit()
+        print(f"  {'repo collateral':22s} {valued:>9,} rows  {time.monotonic() - started:5.1f}s")
+        print(f"  {'margin calls':22s} {calls:>9,} rows")
+        if unvaluable:
+            print(f"  WARNING: {unvaluable} repo(s) have collateral that never priced")
 
         failures = {name: rows for name, rows in queries.validate(conn).items() if rows}
 

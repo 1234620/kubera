@@ -19,7 +19,7 @@ import datetime as dt
 import random
 import sys
 
-from slbdesk import db
+from slbdesk import bonds, db, repo
 
 SEED = 20260918
 TRADES = 400
@@ -56,17 +56,27 @@ WHERE q.num_trades >= 3
 ORDER BY q.trade_date, q.symbol, q.series_code
 """
 
-# Real dated G-Secs to repo, with a traded clean price on some day.
+# Real dated G-Secs to repo, with a traded clean price on some day. The coupon
+# schedule comes along because day-one pricing needs accrued interest.
 COLLATERAL = """
 SELECT
     g.isin,
     t.trade_date,
     t.vwap_clean_price,
-    t.weighted_ytm_pct
+    t.weighted_ytm_pct,
+    g.coupon_pct,
+    g.next_ip_date,
+    g.maturity_date,
+    g.coupon_freq
 FROM gsec AS g
 JOIN gsec_trade_daily AS t
     ON t.security_code = g.security_code
    AND t.instrument_type = 'GS'
+   -- Matched on coupon as well as code: CG2028 is shared by several bonds with
+   -- different coupons, so joining on the code alone would collateralise a repo
+   -- with a price that belongs to a different bond. Same trap the repo
+   -- revaluation hit, and the reason both now key on the ISIN's own price.
+   AND ABS(g.coupon_pct - REGEXP_REPLACE(t.issue_name, '[^0-9.]', '', 'g')::NUMERIC) < 1e-9
 WHERE g.instrument_type = 'GS'
   AND g.maturity_date > t.trade_date + 365
 ORDER BY t.trade_date, g.isin
@@ -200,23 +210,42 @@ def seed_slb(conn, candidates: list, latest: dt.date, rng: random.Random) -> int
 def seed_repo(conn, collateral: list, latest: dt.date, rng: random.Random) -> int:
     """G-Sec repo, priced off a real traded clean price.
 
-    Accrued interest is not computed here -- that is stage 4's bond math. The seed
-    stores the purchase price off the clean value and flags nothing as dirty, so
-    stage 5's revaluation has something to correct against.
+    Day one is priced the same way the daily revaluation prices it: on the DIRTY
+    value and with the haircut the tenor model gives. That consistency matters --
+    an earlier version drew a random haircut and valued the collateral clean, and
+    every position was then under-collateralised from inception against the
+    model's own haircut, so 30% of days generated a margin call that was an
+    artefact of the seed rather than a price move. Calls should come from the
+    market, not from the book disagreeing with itself.
     """
     rows = []
-    for isin, trade_date, clean_price, ytm in rng.sample(collateral, min(REPOS, len(collateral))):
+    for (
+        isin,
+        trade_date,
+        clean_price,
+        ytm,
+        coupon_pct,
+        next_ip_date,
+        maturity_date,
+        coupon_freq,
+    ) in rng.sample(collateral, min(REPOS, len(collateral))):
         tenor = rng.choice([1, 7, 14, 30, 91])
         start = next_business_day(trade_date)
         end = start + dt.timedelta(days=tenor)
 
         nominal = float(rng.choice([50, 100, 250, 500])) * 1_000_000
-        haircut = round(rng.uniform(0.005, 0.04), 6)
+        haircut = repo.haircut_for_gsec((maturity_date - start).days / 365.0)
         # Repo trades a touch under the collateral's own yield: secured funding is
         # cheaper than the asset it is secured against.
         repo_rate = round(max(float(ytm) - rng.uniform(0.15, 0.80), 0.10), 4)
 
-        purchase = round(nominal / 100 * float(clean_price) * (1 - haircut), 4)
+        period_start, _ = bonds.coupon_schedule(
+            start, next_ip_date, maturity_date, coupon_freq or 2
+        )
+        accrued = bonds.accrued_interest(float(coupon_pct), period_start, start)
+        dirty_value = nominal / 100 * (float(clean_price) + accrued)
+
+        purchase = round(dirty_value * (1 - haircut), 4)
         repurchase = round(purchase * (1 + repo_rate / 100 * tenor / 365), 4)
 
         rows.append(

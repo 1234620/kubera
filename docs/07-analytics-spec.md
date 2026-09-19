@@ -312,8 +312,14 @@ Pure functions, `src/slbdesk/bonds/`. Formulas in
 | `repurchase_price` | `purchase_price × (1 + repo_rate_pct / 100 × d / 365)` | ₹ |
 | `accreted_value` | `purchase_price × (1 + repo_rate_pct / 100 × d_elapsed / 365)` | ₹ |
 | `net_exposure` | `accreted_value − post_haircut_value` | ₹ |
-| `shortfall` | `GREATEST(net_exposure − threshold, 0)` | ₹ |
-| `call_amount` | `shortfall` rounded **up** to the minimum transfer amount | ₹ |
+| `shortfall` | `net_exposure`, when it exceeds the threshold | ₹ |
+| `call_amount` | `shortfall` rounded **up** to the minimum transfer amount (₹10 lakh) | ₹ |
+
+The threshold is **0.25% of exposure**, not a flat rupee figure. A flat amount
+cannot serve a book whose positions run from ₹5 crore to ₹50 crore: ₹1 lakh is
+0.2% of the smallest and 0.02% of the largest, so it fires on any price tick and
+half of all days generate a call. A percentage threshold is also what a real CSA
+uses, for the same reason.
 
 G-Sec haircut model, bands documented so the number is not a plug:
 
