@@ -103,8 +103,10 @@ silently.
 2. Spin up a Postgres 16 **service container**, run every migration against it
 3. `pytest` — parser checks against `tests/fixtures/`, bond math checks, FTP
    reconciliation, P&L attribution
-4. Load the fixtures into the CI database and run every validation query in
-   [`07-analytics-spec.md`](07-analytics-spec.md) §11
+4. The analytics tests load the committed fixtures into the CI database, refresh
+   the derived tables and run every validation query from
+   [`07-analytics-spec.md`](07-analytics-spec.md) §11 — each inside a transaction
+   that is rolled back, so the suite leaves the database as it found it
 
 No network calls in CI. That is what the fixtures are for: if NSE is down, CI still
 passes, and CI failing always means *our* code broke.

@@ -92,6 +92,11 @@ Every number traces to a public file. Nothing is invented except the synthetic
 [`docs/05-data-sources.md`](docs/05-data-sources.md) for endpoints, column maps
 and the fixtures in [`tests/fixtures/`](tests/fixtures).
 
+## Author
+
+**Ahmed Moosani** — [@AhmedMoosani](https://github.com/AhmedMoosani).
+See [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
+
 ## Licence
 
 MIT. Market data belongs to NSE / NSE Clearing and is used for education only.

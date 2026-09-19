@@ -1,0 +1,43 @@
+"""Refresh the derived analytics tables, then validate them.
+
+    python scripts/refresh_analytics.py
+
+Exits non-zero if any validation query returns rows, so a broken number fails the
+build rather than reaching the dashboard.
+"""
+
+from __future__ import annotations
+
+import sys
+import time
+
+from slbdesk import db, queries
+
+
+def main() -> int:
+    with db.connect() as conn:
+        for name in queries.REFRESH_ORDER:
+            started = time.monotonic()
+            affected = queries.run(conn, name)
+            conn.commit()
+            print(f"  {name:22s} {affected:>9,} rows  {time.monotonic() - started:5.1f}s")
+
+        failures = {name: rows for name, rows in queries.validate(conn).items() if rows}
+
+    print()
+    for name in queries.VALIDATIONS:
+        if name in failures:
+            rows = failures[name]
+            print(f"FAIL {name}: {len(rows)} offending row(s)")
+            for row in rows[:5]:
+                print(f"       {row}")
+            if len(rows) > 5:
+                print(f"       ... and {len(rows) - 5} more")
+        else:
+            print(f"ok   {name}")
+
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

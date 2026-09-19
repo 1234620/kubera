@@ -44,29 +44,43 @@ utilisation_pct = on_loan_qty / lendable_qty × 100
 
 - **`on_loan_qty`** — `SUM(outstanding_qty)` from `slb_open_position` for the day,
   across all series. Real, from the file.
-- **`lendable_qty`** — *not published*. Estimated as
-  `free_float_shares × lendable_participation_rate`, with free float proxied from
-  the MWPL disclosed in the eligibility criteria and the participation rate set at
-  a documented constant. **`is_estimated = TRUE` on every row**, and the API
-  response carries the flag through to the dashboard, which labels it.
+- **`lendable_qty`** — *not published anywhere*, and MWPL is not in any of the
+  files we ingest, so the original plan to proxy free float from it was not
+  actually available. What **is** observable is delivery volume — the flow of
+  shares into settled custody — so the implemented estimate is
+  `avg_delivery_qty_30d × 40`. Its weakness is stated rather than hidden: delivery
+  measures *flow*, not *stock*, so the multiple is a calibration constant and not
+  a measurement. **`is_estimated = TRUE` on every row**, the API carries the flag
+  through, and the dashboard labels the cell.
+
+  Because of that, `days_to_cover` is reported **alongside** utilisation rather
+  than behind it: `on_loan ÷ avg_volume_30d` needs no estimate at all, so it is
+  the number to trust when the two disagree. Saying which of your metrics is
+  measured and which is modelled is part of the deliverable.
 
 Interpretation: utilisation is the standard industry supply-and-demand gauge —
 on-loan value over total lendable inventory. Rising utilisation against a shrinking
 lendable base is the leading indicator that a name is about to go special; the fee
 is the lagging confirmation.
 
-**Implementation**: `db/queries/utilisation.sql`. Window use: `LAG()` over
-`(symbol ORDER BY trade_date)` for the daily change, and a 5-day moving average
-for the trend column.
+**Implementation**: `db/queries/utilisation.sql` → `slb_utilisation_daily`.
+Window use: `LAG()` over `(symbol ORDER BY trade_date)` for the daily change, a
+5-row moving average for the trend, and a trailing **`RANGE BETWEEN INTERVAL
+'30 days' PRECEDING`** frame for the volume baseline — `RANGE` on the date rather
+than `ROWS`, because a thin name does not trade every day and a row-count frame
+reaches back an unpredictable distance in time.
 
 ### 2.1 Days to cover
 
 ```
-days_to_cover = on_loan_qty / avg_daily_cash_volume_20d
+days_to_cover = on_loan_qty / avg_daily_cash_volume_30d
 ```
 
 How many normal trading days it would take to buy back the borrowed stock. High
-days-to-cover plus high utilisation is a squeeze setup. `db/queries/days_to_cover.sql`.
+days-to-cover plus high utilisation is a squeeze setup.
+
+Folded into `utilisation.sql` rather than given its own file: identical grain,
+identical joins, so a second file would duplicate the query for one column.
 
 ---
 
@@ -117,16 +131,21 @@ Range 0–1. Robust to the whole market repricing, which is its job.
 baseline_mean = AVG(fee_annualised_pct) OVER (
     PARTITION BY symbol
     ORDER BY trade_date
-    ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING
+    RANGE BETWEEN INTERVAL '30 days' PRECEDING AND INTERVAL '1 day' PRECEDING
 )
 baseline_sd   = STDDEV_SAMP(...) OVER (same frame)
 
 own_z = (fee_annualised_pct − baseline_mean) / NULLIF(baseline_sd, 0)
 ```
 
-The frame **excludes today** (`1 PRECEDING`), so today's observation is measured
-against a baseline it did not contribute to. Including it damps exactly the spike
-you are trying to detect.
+The frame **excludes today** (`INTERVAL '1 day' PRECEDING`), so today's
+observation is measured against a baseline it did not contribute to. Including it
+damps exactly the spike you are trying to detect.
+
+`RANGE` over dates, not `ROWS` over observations: a 20-`ROWS` frame on a name that
+prints twice a week reaches back two months, and on a liquid name four weeks — so
+the "20-day baseline" would silently mean a different period per security. A
+30-calendar-day `RANGE` means the same thing for every name.
 
 `own_z` is winsorised to ±5 before blending — a name coming off a 20-day run of
 identical fees has a near-zero standard deviation, which produces an absurd z
@@ -137,6 +156,16 @@ without the clamp.
 ```
 specialness_score = 100 × (0.6 × xs_percentile + 0.4 × norm_cdf(own_z))
 ```
+
+Postgres ships no `erf()`, so `norm_cdf` is the tanh approximation
+`0.5 × (1 + tanh(0.7978845608·z·(1 + 0.044715·z²)))` — maximum absolute error
+about 1e-4 across the clamped range, which is far finer than the score's own
+0–100 resolution.
+
+With **no usable baseline** (fewer than two prior observations) the cross-sectional
+view carries the whole score rather than the row being dropped: a newly eligible
+name still has a borrow cost, and dropping it would hide exactly the names most
+likely to be scarce.
 
 Range 0–100. `norm_cdf` maps the z-score onto 0–1 so the two components are on the
 same scale before weighting. The 60/40 weighting favours the cross-sectional view
@@ -160,13 +189,22 @@ deviations above its own 20-day mean" is.
 Thresholds are declared **once**, here, and referenced from the SQL header. They
 are not duplicated in Python, in the API, or in the frontend.
 
-### Staleness guard
+### The universe, and the staleness guard
 
-Only ~230 of ~800 open `(symbol, series)` pairs trade on a given day. A fee that
-last printed nine days ago is not today's market. Every row carries
-`days_since_last_trade`, and a score computed on a quote older than **three trading
-days** is returned with `is_stale = TRUE`. The dashboard greys those cells rather
-than dropping them, because "no recent print" is itself information about liquidity.
+The score is computed over **open positions**, not over today's prints. Only ~230
+of ~800 open `(symbol, series)` pairs trade on a given day, so scoring what
+printed would ignore three quarters of the exposure. The fee is carried forward
+from the last print via a `LATERAL` "latest at or before this date" lookup — which
+is what the `(symbol, trade_date)` index on `slb_quote_daily` exists for.
+
+A fee that last printed nine days ago is not today's market, so every row carries
+`quote_date` and `days_since_last_trade`, and anything older than **three days** is
+returned with `is_stale = TRUE`. The dashboard greys those cells rather than
+dropping them, because "no recent print" is itself information about liquidity.
+
+The own-history baseline is computed from the **print** history, not the
+carried-forward universe, so a stale pair cannot pollute its own baseline with
+repeats of the same number.
 
 **Implementation**: `db/queries/specialness.sql` → `slb_specialness_daily`.
 
@@ -358,3 +396,4 @@ Not optional. `make analytics` runs these and fails loudly.
 | FTP charges net to zero across desks | `db/queries/validate_ftp_zero.sql` |
 | No position priced off a quote older than 3 trading days without `is_stale` | `db/queries/validate_staleness.sql` |
 | Every market table has rows for the latest ingested date | `db/queries/validate_coverage.sql` |
+| Score, percentile and z are in range and the classification matches the score | `db/queries/validate_specialness_bounds.sql` |

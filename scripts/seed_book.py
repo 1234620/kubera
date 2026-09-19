@@ -100,6 +100,15 @@ def seed_slb(conn, candidates: list, latest: dt.date, rng: random.Random) -> int
         if settle >= reverse_leg_date:
             continue
 
+        # SEBI caps total tenure at 12 months from the trade date, so the furthest
+        # series is not always tradable: by 3-Sep-2026 the Sep-2027 series settles
+        # 369 days out and is already out of reach. This is the NCL worked example
+        # -- a position opened 01-Dec could roll no further than NOV of the next
+        # year, because the DEC expiry falls beyond twelve months (docs/01 §6).
+        # db/queries/validate_tenure.sql is what caught this being ignored.
+        if (reverse_leg_date - trade_date).days > 365:
+            continue
+
         # Size the position in whole shares off a target notional, so quantities
         # look like a desk's rather than like round numbers.
         notional = rng.uniform(2_000_000, 40_000_000)
