@@ -74,6 +74,26 @@ if settlement were exactly on a coupon date — is the single most common bond
 pricing error, and it can be worth tens of basis points of yield on a bond bought
 five months into its coupon period.
 
+### 3.1 The final coupon period — a measured convention, not an assumption
+
+Once a bond is inside its **final coupon period** there is one cash flow left, and
+the market does not compound a single payment. It quotes a **simple ACT/365
+money-market yield**:
+
+```
+y = (final_cash_flow / dirty_price − 1) × 365/days × 100
+```
+
+This was not taken on faith. Validating against NSE's published weighted YTM with
+pure compounding left exactly three outliers across a month of trades, and **every
+one of them was a bond with one coupon left**. Switching those to the simple
+convention reproduced NSE to 0.02bp or better.
+
+`quoted_ytm()` applies the convention; `solve_ytm()` stays purely compounded so it
+keeps its exact round-trip identity with `price_from_ytm()`. Risk measures are
+always taken off the compounded curve, so the derivatives stay consistent with the
+function they differentiate.
+
 ## 4. Yield to maturity
 
 YTM is the single discount rate that sets the present value of all remaining cash
@@ -200,7 +220,36 @@ This is the join an interviewer will look for:
 | Zero-coupon identity | Macaulay duration == maturity |
 | Analytic vs numerical DV01 | Agree to 1e-6 |
 | YTM round-trip | `ytm(price(y)) == y` to 1e-8 |
+| Coupon schedule rolls both ways | Accrued interest ≥ 0 on every day of a period, against a master snapshot on either side of settlement |
 | Against the market | Reproduce `Weighted YTM` in `trd*_sett.csv` from the file's own VWAP clean price for ≥90% of G-Sec rows to within 2bp |
 
 That last one is the real test. It is the difference between "I implemented a
 formula from a textbook" and "my implementation agrees with the exchange".
+
+**Measured result**, across 133 G-Sec trades over 28 trading days:
+
+| | |
+| --- | --- |
+| Within 2bp | **132 / 133 (99.2%)** |
+| Median error | **0.000 bp** |
+| Mean absolute error | **0.08 bp** |
+| 5th–95th percentile | −0.01 bp to +0.02 bp |
+
+The single outlier is a CG2026 print 41 days from maturity where NSE's figure
+matches neither convention; at that residual maturity a fractional-paisa price
+difference moves the yield by basis points, so one thin print is not evidence of a
+formula error. All 28 daily files are committed as fixtures, so CI re-runs this
+comparison on every push with no network.
+
+### 11.1 The bug this found
+
+The coupon schedule originally rolled **forward** only, from the master's
+`Next IP Dt`. The master is a snapshot, so pricing a 14-August trade against an
+18-September snapshot put the period start *after* settlement — giving **negative
+accrued interest** and a dirty price below the clean price.
+
+It was caught by the `dirty_price >= clean_price` CHECK on
+`gsec_analytics_daily`, not by a test: the schema defending itself, which is the
+argument for putting domain invariants in the database. The schedule now rolls in
+both directions and a test walks every day of a coupon period asserting accrued
+interest never goes negative.

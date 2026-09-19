@@ -12,6 +12,7 @@ import sys
 import time
 
 from slbdesk import db, queries
+from slbdesk.analytics import gsec
 
 
 def main() -> int:
@@ -21,6 +22,12 @@ def main() -> int:
             affected = queries.run(conn, name)
             conn.commit()
             print(f"  {name:22s} {affected:>9,} rows  {time.monotonic() - started:5.1f}s")
+
+        # Not SQL: the YTM solve is Newton-Raphson (ADR 0001).
+        started = time.monotonic()
+        affected = gsec.refresh(conn)
+        conn.commit()
+        print(f"  {'gsec analytics':22s} {affected:>9,} rows  {time.monotonic() - started:5.1f}s")
 
         failures = {name: rows for name, rows in queries.validate(conn).items() if rows}
 

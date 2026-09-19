@@ -290,10 +290,18 @@ def parse_gsec_trades(payload: bytes, trade_date: dt.date) -> list[dict]:
     """
     member = f"trd{trade_date.strftime('%d%m')}_sett.csv"
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-        inner = archive.read(member)
+        return parse_gsec_trades_csv(archive.read(member))
 
+
+def parse_gsec_trades_csv(payload: bytes) -> list[dict]:
+    """The settlement CSV on its own, already extracted from the bundle.
+
+    Split out from parse_gsec_trades because the CSV is where the actual logic
+    lives, and the tests validate our YTM against NSE's across a month of these
+    without carrying a month of zip archives.
+    """
     out = []
-    for row in _rows(inner, skip_header=True):
+    for row in _rows(payload, skip_header=True):
         out.append(
             {
                 "trade_date": _date(row[0]),
