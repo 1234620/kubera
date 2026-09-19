@@ -23,6 +23,9 @@ VALIDATIONS = (
     "validate_specialness_bounds",
     "validate_tenure",
     "validate_legs",
+    "validate_ftp_zero",
+    "validate_ftp_reconciliation",
+    "validate_matched_book_pays_little_ftp",
 )
 
 

@@ -86,6 +86,20 @@ repays is charged less — accrual, not a day-one point charge. Sign convention:
 asset (a borrow the desk is financing) is **charged**; a liability (cash the desk
 has raised and passed to Treasury) is **credited**.
 
+**Charged on the net position, not on each leg.** A matched book — borrow a name
+in, lend the same name and series out, same size — consumes almost no balance
+sheet and should earn the fee spread nearly cleanly; a directional book consumes
+real balance sheet and must pay for it. Charging both legs would make FTP a flat
+tax on turnover rather than a price for the resource consumed, and a matched book
+would look loss-making.
+
+What that produces on the seeded book is the clearest argument for the whole
+model: `EQ_FIN` runs ₹789 crore gross at zero net, pays no FTP and keeps its full
+₹131,352/day fee spread, while `DELTA_ONE` runs ₹201 crore directionally and pays
+**₹320,549/day in FTP against only ₹273,310/day in borrow fees**. The dominant
+cost of that arbitrage position is balance sheet, not borrow — and nothing except
+an FTP model surfaces that.
+
 Whether to use **contractual** or **behavioural** tenor is a real modelling choice
 and it is documented in [`adr/0005-ftp-methodology.md`](adr/0005-ftp-methodology.md).
 This repo uses contractual tenor to the reverse-leg date as the default, with an
@@ -109,9 +123,20 @@ The desk owns `desk_spread` — that is its commercial performance, free of any
 funding-mix luck. Treasury owns `treasury_spread` — the return on deliberate
 maturity transformation, which is a position Treasury took and should be measured on.
 
-`tests/test_ftp_reconciliation.py` asserts this identity across the whole book to
-within ₹1. If it does not reconcile, the FTP model is decorative. That test is the
-reason to believe the module.
+`db/queries/validate_ftp_reconciliation.sql` asserts this identity across the
+whole book to within ₹1, and `validate_ftp_zero.sql` asserts the internal ledger
+nets to zero. Both run on every analytics refresh and in CI. If it does not
+reconcile, the FTP model is decorative — those two checks are the reason to
+believe the module.
+
+The identity is only non-trivial because of the netting-to-zero: it collapses to
+fee income less Treasury's real cost of funds precisely because the internal
+transfer cancels. A first version stated it as
+`|(fee + ftp) + treasury_spread − (fee + ftp + treasury_spread)|`, which is true
+by construction and therefore tested nothing. Written properly, it failed at once
+and found a real bug — Treasury had been given a desk spread as well as a treasury
+spread, so its own FTP credit was double-counted. **Treasury is not a business
+desk and has no desk spread**; its entire result is the maturity transformation.
 
 ## 6. Desk allocation
 

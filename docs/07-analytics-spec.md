@@ -212,52 +212,86 @@ repeats of the same number.
 
 ## 5. Financing spread P&L
 
-The desk's actual money. Decomposed so each line is attributable to a decision
+The desk's actual money, decomposed so each line is attributable to a decision
 someone made.
 
-Per position, per day:
+### Fee accrual, per position, per day
 
 ```
 tenor_days        = reverse_leg_date − first_leg_settle_date
 daily_fee_accrual = q × f / tenor_days                            [₹/day]
+fee_pnl_inr       = +daily_fee_accrual  if side = LEND
+                  = −daily_fee_accrual  if side = BORROW
 ```
 
-Straight-line accrual over the contract, ACT/365, starting at **first-leg
-settlement** — not trade date. Starting at trade date overstates the accrual by one
-day on every trade in the book.
-
-```
-fee_income        = +daily_fee_accrual        if side = LEND      [₹/day]
-borrow_cost       = −daily_fee_accrual        if side = BORROW    [₹/day]
-ftp_charge        = −notional × ftp_rate_pct / 100 / 365          [₹/day]
-gross_spread      = fee_income + borrow_cost
-net_spread        = gross_spread + ftp_charge
-```
+Straight-line over the contract, ACT/365, starting at **first-leg settlement** —
+not trade date. Starting at trade date overstates the accrual by one day on every
+trade in the book.
 
 **Sign convention: positive is a gain to our book, always.** A borrow cost is a
 negative number, not a positive number you subtract. Half the sign errors in P&L
 code come from mixing those two styles in one file.
 
-### Attribution
+→ `slb_position_pnl_daily`, one row per (date, trade).
 
-`net_spread` is split into three named effects, which is what a desk head actually
-asks for:
+### The FTP charge, on the *net* position
 
-| Effect | Formula | Question it answers |
-| --- | --- | --- |
-| **Fee spread** | `q × (f_lend − f_borrow) / tenor_days` | Did we price the trade well? |
-| **Term spread** | `notional × (curve(t_long) − curve(t_short)) / 100 / 365` | Did we get paid for the maturity mismatch? |
-| **Funding drag** | `ftp_charge` | What did the balance sheet cost? |
+This is the design decision worth defending. The charge applies to the **net**
+position per `(date, desk, symbol, series)`, not to each leg:
 
-These three must sum to `net_spread`. `tests/test_pnl_attribution.py` asserts it to
-₹0.01 per position.
+```
+net_quantity     = Σ BORROW − Σ LEND
+net_notional_inr = net_quantity × underlying_close
+ftp_charge_inr   = −net_notional × ftp_rate_pct / 100 / 365
+```
 
-**Implementation**: `db/queries/position_pnl.sql` → `slb_position_pnl_daily`.
-Window use: `SUM(net_spread) OVER (PARTITION BY desk_id ORDER BY as_of_date)` for
-running desk P&L, and `SUM(...) OVER (PARTITION BY desk_id, DATE_TRUNC('month', ...))`
-for month-to-date.
+Netting is the point. A matched book — borrow a name in, lend the same name and
+series out, same size — consumes almost no balance sheet, so it should earn the
+fee spread nearly cleanly. A directional book consumes real balance sheet and
+must pay for it. Charging both legs of a matched pair would turn FTP into a flat
+tax on turnover rather than a price for the resource actually consumed, and would
+make a matched book look loss-making.
 
----
+Every charge is **mirrored to `TREASURY`** with the opposite sign, so the internal
+ledger nets to zero by construction. That cancellation is what makes the
+decomposition in §9 an identity rather than a restatement.
+
+→ `ftp_charge_daily`, one row per (date, desk, symbol, series).
+
+### What the split actually shows
+
+On the seeded book, this is the output — and it is the reason the model is worth
+building:
+
+| desk | positions | gross notional | net notional | fee ₹/day | FTP ₹/day | net ₹/day |
+| --- | --- | --- | --- | --- | --- | --- |
+| `EQ_FIN` | 376 | ₹789 cr | **₹0** | +131,352 | **0** | +131,352 |
+| `DELTA_ONE` | 101 | ₹201 cr | ₹201 cr | −273,310 | **−320,549** | −593,859 |
+| `TREASURY` | 0 | — | −₹201 cr | 0 | +320,549 | +639,868 |
+
+`EQ_FIN` runs a perfectly matched book: ₹789 crore gross, zero net, so it pays no
+FTP and keeps its whole fee spread. `DELTA_ONE` is directional, and **its funding
+charge (₹320,549) is larger than the borrow fee it pays (₹273,310)** — so the
+dominant cost of that arbitrage position is balance sheet, not borrow. Nothing but
+an FTP model surfaces that.
+
+### A note on term spread
+
+An earlier draft of this document promised a three-way split into fee spread, term
+spread and funding drag. Term spread — being paid for a maturity mismatch — is
+**structurally zero for this book**, because the seeded matched pairs borrow and
+lend the *same series*, so there is no mismatch to be paid for. Rather than
+fabricate the line, the position-level attribution is the two components that
+genuinely exist:
+
+```
+net_spread_inr = fee_pnl_inr + ftp_charge_inr
+```
+
+and the maturity-transformation return is reported where it actually accrues —
+`treasury_spread_inr` on Treasury's row. Term spread would become a real line the
+moment the book borrowed short and lent long, and the curve to price it is already
+there.
 
 ## 6. Term structure of lending fees
 

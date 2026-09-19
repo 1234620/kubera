@@ -13,7 +13,7 @@ import time
 
 from slbdesk import db, queries
 from slbdesk import repo as repo_analytics
-from slbdesk.analytics import gsec
+from slbdesk.analytics import ftp, gsec
 
 
 def main() -> int:
@@ -37,6 +37,14 @@ def main() -> int:
         print(f"  {'margin calls':22s} {calls:>9,} rows")
         if unvaluable:
             print(f"  WARNING: {unvaluable} repo(s) have collateral that never priced")
+
+        started = time.monotonic()
+        curve, pnl, charges, desks = ftp.refresh(conn)
+        conn.commit()
+        print(f"  {'funding curve':22s} {curve:>9,} rows  {time.monotonic() - started:5.1f}s")
+        print(f"  {'position p&l':22s} {pnl:>9,} rows")
+        print(f"  {'ftp charges':22s} {charges:>9,} rows")
+        print(f"  {'desk p&l':22s} {desks:>9,} rows")
 
         failures = {name: rows for name, rows in queries.validate(conn).items() if rows}
 
