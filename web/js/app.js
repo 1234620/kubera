@@ -21,10 +21,13 @@ const state = {
 
 /* --- KPI strip ------------------------------------------------------------ */
 
+// `lead: true` marks the one card that carries the accent. Six equally bright
+// cards rank nothing -- the reference dashboards give the accent to a single
+// element per region and leave the rest on hairlines.
 const KPI_CARDS = [
   {
     label: "On loan",
-    accent: "var(--accent)",
+    tone: "var(--text-dim)",
     value: (k) => k.on_loan_inr,
     render: money,
     series: "on_loan_inr",
@@ -32,7 +35,8 @@ const KPI_CARDS = [
   },
   {
     label: "Net financing spread",
-    accent: "var(--pos)",
+    lead: true,
+    tone: "var(--accent)",
     value: (k) => k.net_financing_spread_bps,
     render: (v) => bps(v, 1),
     series: "net_financing_spread_bps",
@@ -40,7 +44,7 @@ const KPI_CARDS = [
   },
   {
     label: "Weighted avg fee",
-    accent: "var(--accent-3)",
+    tone: "var(--text-dim)",
     value: (k) => k.weighted_avg_fee_pct,
     render: (v) => pct(v, 2),
     series: "weighted_avg_fee_pct",
@@ -48,7 +52,7 @@ const KPI_CARDS = [
   },
   {
     label: "Utilisation",
-    accent: "var(--accent-2)",
+    tone: "var(--text-dim)",
     value: (k) => k.book_utilisation_pct,
     render: (v) => pct(v, 1),
     series: "book_utilisation_pct",
@@ -57,7 +61,7 @@ const KPI_CARDS = [
   },
   {
     label: "Specials",
-    accent: "var(--warn)",
+    tone: "var(--warn)",
     value: (k) => k.special_count,
     render: (v) => qty(Math.round(v)),
     series: "special_count",
@@ -66,7 +70,7 @@ const KPI_CARDS = [
   },
   {
     label: "Open margin calls",
-    accent: "var(--neg)",
+    tone: "var(--neg)",
     value: (k) => k.open_margin_calls,
     render: (v) => qty(Math.round(v)),
     series: "open_margin_calls",
@@ -80,11 +84,11 @@ function renderKpis() {
     const series = state.history.map((row) => row[card.series]);
     const est = card.estimated?.(k) ? '<span class="tag-est">EST</span>' : "";
     return `
-      <article class="kpi" style="--i:${i}; --kpi-accent:${card.accent}">
+      <article class="kpi${card.lead ? " lead" : ""}" style="--i:${i}">
         <div class="label">${card.label}${est}</div>
         <div class="value" id="kpi-${i}">—</div>
         <div class="foot">${card.foot(k)}</div>
-        ${sparkline(series, card.accent, i)}
+        ${sparkline(series, card.tone, i)}
       </article>`;
   }).join("");
 
@@ -163,8 +167,12 @@ function renderHeatmap() {
         row.is_stale ? `STALE — last print ${row.days_since_last_trade}d ago` : "priced today",
       ].filter(Boolean).join("\n");
 
+      // Below the ramp's midpoint the cell is dark, so dark-on-dark text would
+      // fail contrast. Flip to the light text token instead of relying on one
+      // ink colour across the whole scale.
+      const dark = row.specialness_score < 45 ? " low" : "";
       cells.push(
-        `<div class="cell${row.is_stale ? " stale" : ""}" style="--i:${index};` +
+        `<div class="cell${dark}${row.is_stale ? " stale" : ""}" style="--i:${index};` +
           `background:${heatColour(row.specialness_score)}" title="${title}">` +
           `${num(row.specialness_score, 0)}</div>`
       );
@@ -330,7 +338,7 @@ async function boot() {
       '<option value="">all desks</option>' +
       [...new Set(positions.map((p) => p.desk_id))].sort().map((d) => `<option>${d}</option>`).join("");
   } catch (error) {
-    document.querySelector(".shell").insertAdjacentHTML(
+    document.querySelector(".main").insertAdjacentHTML(
       "afterbegin",
       `<div class="error"><strong>Could not load.</strong> ${error.message}
        <br>Run <code>make up &amp;&amp; make migrate &amp;&amp; make ingest &amp;&amp;

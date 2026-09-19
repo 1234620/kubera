@@ -2,6 +2,20 @@
 
 A desk blotter that looks like a desk blotter. Dark, dense, fast.
 
+## Start from a reference, not from a checklist
+
+Before writing any CSS, find two or three named, award-winning references and
+take concrete cues from them — palette, gradient construction, type scale,
+spacing rhythm, motion character. State which references were used.
+
+This rule exists because the first version of this dashboard satisfied every
+other rule on this page and still looked generic: "has gradients" is not the
+same as "looks designed". The palette now derives from the Robinhood identity by
+Porto Rocha, with Linear, Stripe and Vercel for the dark-first structure. See
+[`../docs/09-frontend.md`](../docs/09-frontend.md).
+
+**One accent.** If the tokens file grows an `--accent-2`, that is the smell.
+
 ## Non-negotiables
 - **No login page.** Ever. This is localhost.
 - **No build step.** Plain HTML, CSS and ES modules. Chart.js from a CDN. If a

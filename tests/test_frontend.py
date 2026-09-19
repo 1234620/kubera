@@ -69,6 +69,35 @@ def test_the_specialness_ramp_is_oklch():
         assert f"--spec-{step}:" in text
 
 
+def test_the_palette_names_its_reference():
+    """A design should be able to say where it came from.
+
+    tokens.css cites the Robinhood identity by Porto Rocha and carries its Robin
+    Neon value, rather than presenting colours nobody can account for.
+    """
+    text = TOKENS.read_text()
+    assert "PORTO ROCHA" in text
+    assert "#CCFF00" in text or "#ccff00" in text
+
+
+def test_there_is_only_one_accent():
+    """Restraint is the whole lesson from the references.
+
+    The first version had --accent, --accent-2 and --accent-3 and used all three
+    at once, so six KPI cards competed instead of ranking.
+    """
+    text = TOKENS.read_text()
+    assert "--accent-2:" not in text
+    assert "--accent-3:" not in text
+
+
+def test_exactly_one_kpi_card_is_the_lead():
+    """Counts the declaration, not the prose: the comment above the list also
+    contains the words, which is why this matches the trailing comma."""
+    app = (WEB / "js" / "app.js").read_text()
+    assert app.count("lead: true,") == 1
+
+
 def test_reduced_motion_is_honoured():
     """An accessibility floor, not an optional extra (rules/FRONTEND.md)."""
     css = (WEB / "css" / "app.css").read_text()
@@ -80,12 +109,22 @@ def test_reduced_motion_is_honoured():
 
 
 def test_the_motion_the_rules_require_is_present():
+    """`drift` is deliberately absent.
+
+    The first design had three coloured blobs drifting behind every card. That is
+    exactly the "fintech rainbow gradient" the Robinhood/Porto Rocha rebrand won
+    its category for rejecting, so the background is now a single static warm
+    lift and the motion is all purposeful: entry, draw-in, shimmer, alert.
+    """
     css = (WEB / "css" / "app.css").read_text()
-    for keyframe in ("drift", "rise", "rowin", "shimmer", "called", "draw"):
+    for keyframe in ("rise", "rowin", "fade", "shimmer", "called", "beat", "draw"):
         assert f"@keyframes {keyframe}" in css, keyframe
-    # Gradients on the background, the cards and the panels.
+    assert "@keyframes drift" not in css
+
+    # Gradients still do work -- surface depth, the rail, the specialness ramp,
+    # the skeleton sweep -- they just no longer shout.
     assert css.count("linear-gradient") >= 6
-    assert css.count("radial-gradient") >= 3
+    assert css.count("radial-gradient") >= 2
 
 
 def test_only_allowed_cdns_are_referenced():
@@ -110,6 +149,26 @@ def test_the_frontend_does_not_compute_analytics():
     app = (WEB / "js" / "app.js").read_text()
     assert "365" not in app
     assert "fee_annualised_pct" in app  # consumed, not derived
+
+
+def test_no_duplicate_element_ids():
+    """A duplicate id is a silent, ugly bug.
+
+    The blotter section briefly shared id="blotter" with its own tbody, so
+    setting innerHTML hit the SECTION first and wiped the header controls the
+    next line then tried to write into. Section anchors carry a `sec-` prefix
+    precisely so they cannot collide with the ids the JS writes into.
+    """
+    ids = re.findall(r'\bid="([^"]+)"', INDEX.read_text())
+    duplicates = {value for value in ids if ids.count(value) > 1}
+    assert not duplicates, duplicates
+
+
+def test_every_nav_anchor_resolves():
+    html = INDEX.read_text()
+    targets = set(re.findall(r'\bid="([^"]+)"', html))
+    anchors = {a for a in re.findall(r'href="#([^"]+)"', html)}
+    assert anchors <= targets, anchors - targets
 
 
 def test_numbers_are_tabular():

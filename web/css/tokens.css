@@ -1,53 +1,80 @@
 /* Design tokens. Every colour in the dashboard is defined here and nowhere else
-   (rules/FRONTEND.md). Dark by default -- this is a trading screen. */
+   (rules/FRONTEND.md). Dark-first, because this is a trading screen.
+
+   REFERENCE: the Robinhood identity by PORTO ROCHA (2024), which won its
+   category for doing the opposite of what fintech usually does. Its colour
+   strategy "departs from competitors' rainbow approach, opting instead for a
+   focused palette of black, white and mature neutrals that make room for pops
+   of Robin Neon". Robin Neon is #CCFF00; the neutrals are warm, not blue.
+
+   The first version of this dashboard was exactly the rainbow that rebrand
+   rejected -- a blue/purple/cyan mesh gradient behind every card. Loud, generic,
+   and it made six KPI cards compete with each other instead of ranking. This
+   palette is one accent on warm near-black, and the gradients now do work
+   (surface depth, data fills) rather than decoration.
+
+   Secondary references for the dark-first structure: Linear (cool restraint,
+   near-black surfaces, one brand accent), Stripe (dense data tables), Vercel
+   (near-monochrome plus context colour). Their shared lesson is restraint, so
+   the accent appears on roughly one element per screen region, never on all. */
 
 :root {
   color-scheme: dark;
 
-  /* Surfaces */
-  --bg:              #070a12;
-  --bg-deep:         #04060c;
-  --surface:         #0d1220;
-  --surface-raised:  #131a2c;
-  --surface-hover:   #18213a;
-  --border:          #1e2740;
-  --border-bright:   #2c3a5e;
+  /* Surfaces. Warm near-black, after Porto Rocha's #1C180D -- a blue-black
+     makes financial green/red read as neon; a warm black lets them sit. */
+  --bg:             #0b0a07;
+  --bg-deep:        #070604;
+  --surface:        #131109;
+  --surface-raised: #1a1710;
+  --surface-hover:  #221e15;
 
-  /* Text */
-  --text:            #e8ecf6;
-  --text-dim:        #8b96b0;
-  --text-faint:      #5b6684;
+  /* Hairlines at low alpha, which is how Linear and Stripe separate dense rows
+     without drawing a grid. */
+  --border:         #2a2619;
+  --border-bright:  #3d3826;
 
-  /* Accents */
-  --accent:          #4d8dff;
-  --accent-2:        #9d6bff;
-  --accent-3:        #22d3ee;
+  /* Warm neutral text ramp, from the rebrand's #D4D0C9 / #B4B1AB / #8A8783. */
+  --text:           #eae7dd;
+  --text-dim:       #b4b1ab;
+  --text-faint:     #8a8783;
 
-  /* Gain and loss are NOT bare red/green: these are adjusted for deuteranopia,
-     and colour is never the only channel -- sign and position carry it too. */
-  --pos:             #2dd4a7;
-  --pos-dim:         #17806a;
-  --neg:             #ff7a92;
-  --neg-dim:         #8f2f45;
-  --warn:            #ffc861;
+  /* ONE accent. Robin Neon. Used for the primary metric, focus rings and the
+     single most important series on a chart -- nothing else. */
+  --accent:         #ccff00;
+  --accent-soft:    #a8d100;
+  --accent-ink:     #171a00;   /* text laid on the accent */
 
-  /* Specialness ramp, stepped in OKLCH so the gradient is perceptually even.
-     A naive HSL ramp bunches up in the greens and misleads the eye. */
-  --spec-0: oklch(38% 0.045 250);
-  --spec-1: oklch(52% 0.105 215);
-  --spec-2: oklch(66% 0.135 175);
-  --spec-3: oklch(76% 0.150 90);
-  --spec-4: oklch(68% 0.190 35);
-  /* Text laid on a heat cell. The ramp is light across its whole range, so this
-     stays dark in both themes rather than following --text. */
-  --on-heat: oklch(16% 0.02 250);
+  /* Gain and loss. Adjusted for deuteranopia and kept muted so they never
+     compete with the accent; colour is never the only channel, sign and
+     position carry it too. */
+  --pos:            #5fd3a2;
+  --neg:            #ff8b73;
+  --warn:           #ffc861;
 
-  /* Geometry */
-  --radius:       14px;
-  --radius-sm:    9px;
-  --gutter:       16px;
-  --ease:         cubic-bezier(.4, 0, .2, 1);
+  /* Specialness ramp. Sequential in OKLCH so the gradient is perceptually even
+     -- a naive HSL ramp bunches up in the greens and misleads the eye. Runs
+     from the warm surface through the accent's hue family into a hot amber, so
+     it belongs to this palette rather than importing a second one. */
+  --spec-0: oklch(30% 0.022 95);
+  --spec-1: oklch(45% 0.070 105);
+  --spec-2: oklch(62% 0.130 110);
+  --spec-3: oklch(78% 0.185 105);
+  --spec-4: oklch(72% 0.185 55);
 
+  /* Text laid on a heat cell. The ramp is light across most of its range, so
+     this stays dark in both themes rather than following --text. */
+  --on-heat: oklch(18% 0.02 95);
+
+  /* Geometry. Four radii, one easing, one shadow recipe. */
+  --radius:    12px;
+  --radius-sm: 8px;
+  --gutter:    16px;
+  --sidebar:   232px;
+  --ease:      cubic-bezier(.32, .72, 0, 1);
+  --shadow:    0 1px 2px rgb(0 0 0 / .4), 0 12px 32px -20px rgb(0 0 0 / .9);
+
+  /* Inter and JetBrains Mono: both open-source, and Inter is what Linear uses. */
   --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -56,22 +83,26 @@
   :root:not([data-theme="dark"]) {
     color-scheme: light;
 
-    --bg:             #f4f6fb;
-    --bg-deep:        #e8ecf5;
-    --surface:        #ffffff;
-    --surface-raised: #ffffff;
-    --surface-hover:  #eef2fa;
-    --border:         #d8e0ee;
-    --border-bright:  #bcc8dd;
+    --bg:             #f7f5ef;
+    --bg-deep:        #eeebe2;
+    --surface:        #fffefb;
+    --surface-raised: #fffefb;
+    --surface-hover:  #f2efe6;
 
-    --text:           #0d1424;
-    --text-dim:       #4d5872;
-    --text-faint:     #7b86a0;
+    --border:         #ddd8ca;
+    --border-bright:  #c3bdaa;
 
-    --pos:            #0f8f70;
-    --pos-dim:        #a7e5d3;
-    --neg:            #c4304d;
-    --neg-dim:        #f6c2cc;
-    --warn:           #a96a00;
+    --text:           #1c180d;
+    --text-dim:       #5c584c;
+    --text-faint:     #8a8783;
+
+    /* The neon needs darkening on a light ground or it disappears. */
+    --accent:         #6f8c00;
+    --accent-soft:    #8caa00;
+    --accent-ink:     #ffffff;
+
+    --pos:            #12805f;
+    --neg:            #c04a2e;
+    --warn:           #9a6a00;
   }
 }

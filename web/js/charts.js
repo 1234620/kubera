@@ -31,7 +31,9 @@ const BASE_SCALES = () => ({
     Plotting against the series code instead would order the curve
     alphabetically and make its shape a lie (docs/09). */
 export function termStructureChart(canvas, series) {
-  const palette = [token("--accent"), token("--accent-2"), token("--accent-3"), token("--warn")];
+  // The accent first, then muted tones. Restraint: the first series is the one
+  // being asked about, and the rest are context.
+  const palette = [token("--accent"), token("--pos"), token("--warn"), token("--text-faint")];
 
   return new Chart(canvas, {
     type: "line",
@@ -85,8 +87,8 @@ export function termStructureChart(canvas, series) {
 /** The funding curve, with the extrapolated nodes drawn hollow so an estimate
     never looks measured. */
 export function fundingCurveChart(canvas, points) {
-  const base = token("--accent-3");
-  const ftp = token("--accent-2");
+  const base = token("--text-faint");
+  const ftp = token("--accent");
 
   return new Chart(canvas, {
     type: "line",
