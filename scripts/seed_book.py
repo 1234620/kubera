@@ -30,8 +30,22 @@ REPOS = 60
 BORROW_FEE_FACTOR = 0.88
 LEND_FEE_FACTOR = 1.14
 
+# Everything derived from the book, not just the book itself. Regenerating the
+# trades while leaving the P&L and FTP tables behind would leave rows keyed to
+# trade_ids that no longer exist -- and because the analytics upsert rather than
+# replace, the stale rows would survive the next refresh and quietly inflate the
+# book. `make bootstrap` is what surfaced this: the list had not been updated
+# when stage 6 added the P&L tables.
 TRUNCATE = """
-TRUNCATE margin_call, collateral_position, repo_trade, slb_trade_leg, slb_trade
+TRUNCATE
+    desk_pnl_daily,
+    ftp_charge_daily,
+    slb_position_pnl_daily,
+    margin_call,
+    collateral_position,
+    repo_trade,
+    slb_trade_leg,
+    slb_trade
 RESTART IDENTITY
 """
 

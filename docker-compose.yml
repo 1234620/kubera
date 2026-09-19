@@ -29,5 +29,25 @@ services:
       db:
         condition: service_healthy
 
+  # One-shot: migrate, ingest, seed, refresh. Runs under a profile so `up` does
+  # not trigger a 30-day download every time the stack starts.
+  #   docker compose --profile setup run --rm bootstrap
+  # or just `make bootstrap`.
+  bootstrap:
+    build: .
+    profiles: ["setup"]
+    command: python scripts/bootstrap.py
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-slbdesk}
+      POSTGRES_USER: ${POSTGRES_USER:-slbdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-slbdesk}
+      INGEST_DAYS: ${INGEST_DAYS:-30}
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

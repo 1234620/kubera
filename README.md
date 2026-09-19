@@ -25,17 +25,43 @@ Two job descriptions, read literally:
 | "good python/sql programming skills" | [`db/queries/`](db/queries) — window functions and CTEs, no `SELECT *` |
 | "Funding Transfer Pricing" (EFG JD, by name) | [`src/slbdesk/analytics/ftp.py`](src/slbdesk/analytics/ftp.py), [`docs/04-domain-ftp.md`](docs/04-domain-ftp.md) |
 
+## What it found
+
+The point of building it on real files rather than synthetic ones is that the
+data pushes back. A few of the things that only surfaced by doing the work:
+
+- **NSE does not always 404 a holiday.** It serves a *stale* cash bhavcopy under
+  the holiday's own filename — `sec_bhavdata_full_14092026.csv` returns 200 with
+  11-Sep rows. A backfill trusting the filename loads one day's prices under
+  several dates. The ingester trusts the date inside the file.
+- **The begin-day VaR file's third column is the series code, not a serial.** It
+  repeats all 1,176 securities across 73 series, which makes it the only complete
+  series master — 12 regular + 12 non-foreclosing + 48 rollover + `R3`, exactly
+  matching the NCL circular.
+- **NSE quotes a simple ACT/365 yield inside the final coupon period.** Pure
+  compounding left three outliers against NSE's published weighted YTM and every
+  one was a bond with one cash flow left. Implementing the convention took
+  agreement from 97.7% to **99.2% within 2bp, median error 0.000bp**.
+- **A code like `CG2028` is shared by several bonds with different coupons.**
+  Joining on the code alone prices the wrong bond — it produced repo collateral
+  shortfalls of 7.5%, which is far too large for daily variation margin on
+  G-Secs, and that implausibility is what exposed it.
+- **Lendable supply is not published in India at all.** So utilisation is an
+  estimate, every row says so, and `days_to_cover` — which needs no estimate —
+  is reported beside it rather than behind it.
+
 ## What it computes
 
 **Securities lending**
-- Financing spread P&L per trade and per book, decomposed into fee spread, term
-  spread and reinvestment
+- Financing spread P&L per position and per desk, split into fee accrual and
+  funding drag
 - Borrow cost and funding cost per position
 - Utilisation (on-loan ÷ lendable) from NSE eligible-security and open-position files
-- **Specialness score** — a percentile-and-z-blend of lending fee against the
-  security's own history and the GC cohort, with a GC / warm / special / hard-to-borrow
-  classification
-- Term structure of lending fees across the 12 monthly series
+- **Specialness score** — a blend of the cross-sectional percentile of the
+  annualised fee within its tenor bucket and a z-score against the security's own
+  trailing baseline, classified GC / warm / special / hard-to-borrow. Both
+  components are stored, because "87" is not an answer.
+- Term structure of lending fees across the monthly series
 
 **Bond leg (Indian G-Secs)**
 - Accrued interest on the Indian 30/360 convention, clean ⇄ dirty price
@@ -48,26 +74,52 @@ Two job descriptions, read literally:
 - Repo interest accrual on ACT/365
 
 **Funds Transfer Pricing**
-- Matched-maturity transfer rate off a funding curve, plus term liquidity premium
-- Net interest margin split into a desk spread and a treasury spread so the two
-  sides add back to the book's actual P&L
+- Matched-maturity transfer rate off a funding curve, plus a term liquidity
+  premium and a contingent liquidity charge driven by the NSE recall-eligibility
+  flag
+- Charged on the **net** position per desk and name, so a matched book pays
+  almost nothing and a directional one pays for the balance sheet it uses
+- Net interest margin split into a desk spread and a treasury spread that add
+  back to the book — asserted to the rupee on every refresh
+
+On the seeded book this is the whole argument for the model:
+
+| desk | positions | gross | net | fee ₹/day | FTP ₹/day | net ₹/day |
+| --- | --- | --- | --- | --- | --- | --- |
+| `EQ_FIN` | 376 | ₹789 cr | **₹0** | +131,352 | **0** | +131,352 |
+| `DELTA_ONE` | 101 | ₹201 cr | ₹201 cr | −273,310 | **−320,549** | −593,859 |
+| `TREASURY` | 0 | — | −₹201 cr | 0 | +320,549 | +639,868 |
+
+The matched book keeps its spread. The directional one pays **more in funding
+than it pays in borrow fees** — so the dominant cost of that arbitrage position
+is balance sheet, not borrow, and nothing else surfaces that.
 
 ## Stack
 
 Postgres 16 · Python 3.12 · FastAPI · vanilla-JS dashboard · Power BI · Docker
 Compose · GitHub Actions.
 
-No ORM, no build step, no login page. Reasons in [`docs/adr/`](docs/adr).
+No ORM, no migration framework, no frontend build step, no login page. Six
+dependencies in total. Reasons in [`docs/adr/`](docs/adr).
 
 ## Quick start
 
+Docker is the only prerequisite.
+
 ```bash
-make up          # postgres + api in docker
-make migrate     # apply db/migrations in order
-make ingest      # pull the latest NSE SLB + WDM files
-make analytics   # refresh derived tables
-make test        # pytest
+cp .env.example .env
+make up          # postgres + api
+make bootstrap   # migrate, ingest 30 trading days, seed the book, refresh analytics
 open http://localhost:8000
+```
+
+`make bootstrap` takes about a minute: one request per file per trading day
+against a public archive, deliberately paced. `make help` lists every target.
+
+```bash
+make test        # full suite in the container, including the Postgres checks
+make test-ci     # the same suite against a throwaway fixture-only database
+make analytics   # refresh derived tables and run the eight validation queries
 ```
 
 ## Documentation
@@ -85,12 +137,38 @@ Read in this order:
 9. [API](docs/08-api-spec.md) · [Frontend](docs/09-frontend.md) · [Runbook](docs/10-runbook.md)
 10. [Glossary](docs/11-glossary.md) · [Interview notes](docs/12-interview-notes.md)
 
+## How it is checked
+
+232 tests, and the ones that matter are not unit tests:
+
+| Check | Where |
+| --- | --- |
+| Our G-Sec yields reproduce **NSE's own published weighted YTM** — 132/133 within 2bp, median error 0.000bp | `tests/test_bonds.py` |
+| The FTP decomposition **adds back to book NIM** to within ₹1 | `db/queries/validate_ftp_reconciliation.sql` |
+| The internal FTP ledger **nets to zero** across desks | `db/queries/validate_ftp_zero.sql` |
+| Rollover chains respect **SEBI's 12-month tenure cap** | `db/queries/validate_tenure.sql` |
+| Average fee rises monotonically across the specialness bands — emergent, not fitted | `tests/test_analytics.py` |
+| Analytic DV01 agrees with repricing at ±1bp to 1e-6 | `tests/test_bonds.py` |
+| The loader's natural keys match the actual primary keys in `pg_index` | `tests/test_load.py` |
+| The dashboard obeys its own rules — no build step, no login, no colour literal outside tokens | `tests/test_frontend.py` |
+
+Eight validation queries run on every `make analytics` and fail the build rather
+than letting a wrong number reach the dashboard. CI runs the whole suite against
+a real Postgres with **no network**, using committed fixtures — so if NSE is down,
+CI still passes, and CI failing always means our code broke.
+
+Every one of those checks has caught a real bug at least once. The commit
+messages say which.
+
 ## Data provenance
 
 Every number traces to a public file. Nothing is invented except the synthetic
 *book* (our own trades) — the *market* is real. See
 [`docs/05-data-sources.md`](docs/05-data-sources.md) for endpoints, column maps
 and the fixtures in [`tests/fixtures/`](tests/fixtures).
+
+Three limits, stated rather than buried: the book is synthetic, `lendable_qty` is
+an estimate because nobody publishes it, and everything is end-of-day.
 
 ## Author
 

@@ -16,6 +16,9 @@ down: ## Stop everything
 logs: ## Tail container logs
 	$(COMPOSE) logs -f api db
 
+bootstrap: ## Everything: migrate, ingest, seed, refresh analytics
+	$(COMPOSE) --profile setup run --rm bootstrap
+
 migrate: ## Apply pending migrations
 	$(COMPOSE) run --rm api python scripts/migrate.py
 

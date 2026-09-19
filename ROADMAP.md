@@ -1,21 +1,24 @@
 # Roadmap
 
+**All ten stages are complete.** Each is tagged `stage-N`; `git log` carries the
+reasoning for every one, including the bugs each stage found.
+
 Ten stages. Each stage ends in a commit **and a push**, tagged `stage-N`.
 A stage is not done until: code works, one runnable check passes, the matching
 doc section is written, CI is green.
 
 | Stage | Name | Deliverable | Tag |
 | --- | --- | --- | --- |
-| 0 | Skeleton | Repo, docs, rules, CI, real fixtures | `stage-0` |
-| 1 | Ingestion | NSE client + parsers for 5 SLB files and the WDM G-Sec master, landing to `data/raw` | `stage-1` |
-| 2 | Schema | Postgres migrations, loaders, referential integrity, a seeded synthetic book | `stage-2` |
-| 3 | SLB analytics | `db/queries/` — utilisation, fee term structure, specialness, spread P&L | `stage-3` |
-| 4 | Bond leg | Accrued interest, clean/dirty, YTM, duration, convexity, DV01 on real G-Secs | `stage-4` |
-| 5 | Repo | Haircuts, collateral valuation, variation margin, margin calls | `stage-5` |
-| 6 | FTP | Funding curve, matched-maturity transfer rate, term liquidity premium, desk allocation | `stage-6` |
-| 7 | API | FastAPI over the analytics layer, OpenAPI docs | `stage-7` |
-| 8 | Dashboard | Single-page desk blotter with gradients and animation | `stage-8` |
-| 9 | Ship | Docker Compose, Power BI model, README screenshots, final CI | `stage-9` |
+| 0 | Skeleton | Repo, docs, rules, CI, real fixtures | `stage-0` ✅ |
+| 1 | Ingestion | NSE client + parsers for 5 SLB files and the WDM G-Sec master, landing to `data/raw` | `stage-1` ✅ |
+| 2 | Schema | Postgres migrations, loaders, referential integrity, a seeded synthetic book | `stage-2` ✅ |
+| 3 | SLB analytics | `db/queries/` — utilisation, fee term structure, specialness, spread P&L | `stage-3` ✅ |
+| 4 | Bond leg | Accrued interest, clean/dirty, YTM, duration, convexity, DV01 on real G-Secs | `stage-4` ✅ |
+| 5 | Repo | Haircuts, collateral valuation, variation margin, margin calls | `stage-5` ✅ |
+| 6 | FTP | Funding curve, matched-maturity transfer rate, term liquidity premium, desk allocation | `stage-6` ✅ |
+| 7 | API | FastAPI over the analytics layer, OpenAPI docs | `stage-7` ✅ |
+| 8 | Dashboard | Single-page desk blotter with gradients and animation | `stage-8` ✅ |
+| 9 | Ship | Docker Compose, Power BI model, README screenshots, final CI | `stage-9` ✅ |
 
 ## Stage detail
 
