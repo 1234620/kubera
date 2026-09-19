@@ -5,11 +5,10 @@ the recorded one fails the run rather than diverging silently.
 """
 
 import hashlib
-import os
 import pathlib
 import sys
 
-import psycopg
+from slbdesk.db import connect
 
 MIGRATIONS = pathlib.Path(__file__).parent.parent / "db" / "migrations"
 
@@ -22,19 +21,9 @@ CREATE TABLE IF NOT EXISTS schema_migration (
 """
 
 
-def dsn() -> str:
-    return (
-        f"host={os.environ.get('POSTGRES_HOST', 'localhost')}"
-        f" port={os.environ.get('POSTGRES_PORT', '5432')}"
-        f" dbname={os.environ.get('POSTGRES_DB', 'slbdesk')}"
-        f" user={os.environ.get('POSTGRES_USER', 'slbdesk')}"
-        f" password={os.environ.get('POSTGRES_PASSWORD', 'slbdesk')}"
-    )
-
-
 def main() -> int:
     files = sorted(MIGRATIONS.glob("*.sql"))
-    with psycopg.connect(dsn(), autocommit=False) as conn:
+    with connect() as conn:
         conn.execute(TRACKING_TABLE)
         conn.commit()
         applied = dict(conn.execute("SELECT version, checksum FROM schema_migration").fetchall())

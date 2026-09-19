@@ -31,7 +31,10 @@ seed: ## Generate the synthetic book
 analytics: ## Refresh derived tables, then run validation queries
 	$(COMPOSE) run --rm api python scripts/refresh_analytics.py
 
-test: ## Run pytest
+test: ## Run the full suite (in the container, so the database tests run too)
+	$(COMPOSE) run --rm api python -m pytest -q
+
+test-local: ## Run pytest on the host (database tests skip)
 	pytest -q
 
 lint: ## Lint and format check

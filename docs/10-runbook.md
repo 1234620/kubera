@@ -30,9 +30,9 @@ open http://localhost:8000
 | `migrate` | Apply pending migrations, record them in `schema_migration` |
 | `ingest` | Fetch and load. `DAYS=60 make ingest` to backfill further |
 | `ingest-date` | `DATE=2026-09-18 make ingest-date` for one day |
-| `seed` | Generate the synthetic book. Idempotent; truncates and regenerates |
+| `seed` | Generate the synthetic book from real quotes. Idempotent; truncates and regenerates. Seeded, so it reproduces |
 | `analytics` | Refresh derived tables, then run every validation query |
-| `test` | `pytest` |
+| `test` | Full suite in the container, so the Postgres tests run. `test-local` runs on the host and skips them |
 | `lint` | `ruff check` and `ruff format --check` |
 | `psql` | Open a shell on the database |
 | `reset` | Drop and recreate the database. Asks first |

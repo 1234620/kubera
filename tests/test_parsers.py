@@ -10,7 +10,6 @@ import re
 
 import pytest
 
-from slbdesk.ingest import __main__ as ingest_main
 from slbdesk.ingest import nse, parse
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
@@ -316,5 +315,5 @@ def test_is_trading_day_rejects_a_stale_holiday_file():
     exchange holiday on which NSE really does serve 11-Sep rows -- must be False.
     """
     payload = load("sec_bhavdata_full_18092026.csv")
-    assert ingest_main.is_trading_day(payload, DATE) is True
-    assert ingest_main.is_trading_day(payload, dt.date(2026, 9, 14)) is False
+    assert parse.is_trading_day(payload, DATE) is True
+    assert parse.is_trading_day(payload, dt.date(2026, 9, 14)) is False

@@ -236,6 +236,19 @@ def parse_cash_bhavcopy(payload: bytes) -> list[dict]:
     return out
 
 
+def is_trading_day(payload: bytes, date: dt.date) -> bool:
+    """Whether the cash bhavcopy NSE served is actually for the date we asked for.
+
+    On an exchange holiday NSE does not 404 the cash bhavcopy -- it serves a
+    *stale* copy under the holiday's own filename. `sec_bhavdata_full_14092026.csv`
+    returns 200 with 11-Sep-2026 rows. Without this check a backfill loads one
+    day's prices under several dates, quietly corrupting every fee annualisation
+    and every mark. Trust the date inside the file, never the date in its name.
+    """
+    rows = parse_cash_bhavcopy(payload)
+    return bool(rows) and rows[0]["trade_date"] == date
+
+
 def parse_gsec_master(payload: bytes) -> list[dict]:
     """Central-government paper from the WDM security list: SECTYPE in (GS, TB).
 
