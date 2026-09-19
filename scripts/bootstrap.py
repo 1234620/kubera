@@ -15,6 +15,8 @@ import sys
 import time
 
 DAYS = os.environ.get("INGEST_DAYS", "30")
+# Honour API_PORT so the closing message is not a lie when it has been changed.
+PORT = os.environ.get("API_PORT", "8000")
 
 
 def step(name: str, run) -> None:
@@ -44,7 +46,7 @@ def main() -> int:
     step("seed synthetic book", seed_book.main)
     step("refresh analytics", refresh_analytics.main)
 
-    print("\nReady. Open http://localhost:8000")
+    print(f"\nReady. Open http://localhost:{PORT}")
     return 0
 
 
