@@ -46,6 +46,11 @@ data pushes back. A few of the things that only surfaced by doing the work:
   Joining on the code alone prices the wrong bond — it produced repo collateral
   shortfalls of 7.5%, which is far too large for daily variation margin on
   G-Secs, and that implausibility is what exposed it.
+- **`issue_name` means two different things.** It is the coupon for a G-Sec and
+  the maturity date, as DDMMYY, for a T-bill — whose security code is only its
+  original tenor and so identifies dozens of different bills. Joining bills on
+  code alone bootstrapped a **149% short rate**, which is how the problem
+  announced itself.
 - **Lendable supply is not published in India at all.** So utilisation is an
   estimate, every row says so, and `days_to_cover` — which needs no estimate —
   is reported beside it rather than behind it.
@@ -62,6 +67,19 @@ data pushes back. A few of the things that only surfaced by doing the work:
   trailing baseline, classified GC / warm / special / hard-to-borrow. Both
   components are stored, because "87" is not an answer.
 - Term structure of lending fees across the monthly series
+
+**Curve construction** (the quant layer)
+- A **zero-coupon curve** bootstrapped from T-bills and G-Secs, solved as a fixed
+  point because interpolated coupons depend on the factor being solved
+- A **Nelson-Siegel-Svensson** parametric fit — separable least squares, no
+  optimiser dependency — averaging 5.5bp RMSE over ~38 instruments a day
+- Both published side by side: the bootstrap is exact where something traded, NSS
+  is smooth and extrapolates, and `is_extrapolated` marks where each is reaching
+- **Forward rates** from the curve, and the **SLB fee curve read as a forward
+  curve** — PIIND at 51% to 15 days and 19% to 43 days implies 2% for the 28 days
+  between, so the market is pricing that squeeze to be over within a fortnight
+- **Key-rate DV01** bucketed by tenor, because a parallel DV01 cannot tell a
+  10-year position from a barbell of 2s and 30s
 
 **Bond leg (Indian G-Secs)**
 - Accrued interest on the Indian 30/360 convention, clean ⇄ dirty price
@@ -135,7 +153,8 @@ Read in this order:
 7. [Data model](docs/06-data-model.md)
 8. [Analytics specification](docs/07-analytics-spec.md)
 9. [API](docs/08-api-spec.md) · [Frontend](docs/09-frontend.md) · [Runbook](docs/10-runbook.md)
-10. [Glossary](docs/11-glossary.md) · [Interview notes](docs/12-interview-notes.md)
+10. [Curve construction](docs/13-curve-construction.md) — bootstrap, NSS, forwards, key rates
+11. [Glossary](docs/11-glossary.md) · [Interview notes](docs/12-interview-notes.md)
 
 ## How it is checked
 
@@ -144,6 +163,9 @@ Read in this order:
 | Check | Where |
 | --- | --- |
 | Our G-Sec yields reproduce **NSE's own published weighted YTM** — 132/133 within 2bp, median error 0.000bp | `tests/test_bonds.py` |
+| Our T-bill yields reproduce NSE's to a **median 0.002bp** | `docs/13` §1 |
+| The bootstrap **reprices every input it accepts** | `tests/test_curves.py` |
+| Simultaneous key-rate shocks equal a parallel shift **exactly** | `tests/test_curves.py` |
 | The FTP decomposition **adds back to book NIM** to within ₹1 | `db/queries/validate_ftp_reconciliation.sql` |
 | The internal FTP ledger **nets to zero** across desks | `db/queries/validate_ftp_zero.sql` |
 | Rollover chains respect **SEBI's 12-month tenure cap** | `db/queries/validate_tenure.sql` |

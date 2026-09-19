@@ -13,7 +13,7 @@ import time
 
 from slbdesk import db, queries
 from slbdesk import repo as repo_analytics
-from slbdesk.analytics import ftp, gsec
+from slbdesk.analytics import curves, ftp, gsec
 
 
 def main() -> int:
@@ -45,6 +45,12 @@ def main() -> int:
         print(f"  {'position p&l':22s} {pnl:>9,} rows")
         print(f"  {'ftp charges':22s} {charges:>9,} rows")
         print(f"  {'desk p&l':22s} {desks:>9,} rows")
+
+        started = time.monotonic()
+        for label, count in curves.refresh(conn).items():
+            print(f"  {label:22s} {count:>9,} rows")
+        conn.commit()
+        print(f"  {'(curve build)':22s} {'':>9}       {time.monotonic() - started:5.1f}s")
 
         failures = {name: rows for name, rows in queries.validate(conn).items() if rows}
 

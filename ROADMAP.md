@@ -1,6 +1,6 @@
 # Roadmap
 
-**All ten stages are complete.** Each is tagged `stage-N`; `git log` carries the
+**All eleven stages are complete.** Each is tagged `stage-N`; `git log` carries the
 reasoning for every one, including the bugs each stage found.
 
 Ten stages. Each stage ends in a commit **and a push**, tagged `stage-N`.
@@ -19,6 +19,7 @@ doc section is written, CI is green.
 | 7 | API | FastAPI over the analytics layer, OpenAPI docs | `stage-7` ✅ |
 | 8 | Dashboard | Single-page desk blotter with gradients and animation | `stage-8` ✅ |
 | 9 | Ship | Docker Compose, Power BI model, README screenshots, final CI | `stage-9` ✅ |
+| 10 | Curve construction | Zero-coupon bootstrap, NSS fit, forwards, SLB implied forwards, key-rate DV01 | `stage-10` ✅ |
 
 ## Stage detail
 

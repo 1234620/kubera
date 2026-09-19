@@ -59,6 +59,13 @@ LIST_ENDPOINTS = [
     "/api/ftp/curve",
     "/api/ftp/charges?limit=5",
     "/api/ftp/decomposition",
+    "/api/curves/zero",
+    "/api/curves/zero?method=NSS",
+    "/api/curves/nss",
+    "/api/curves/observations",
+    "/api/slb/implied-forwards?limit=5",
+    "/api/slb/implied-forwards?signal=RESOLVING",
+    "/api/repo/key-rate-dv01",
 ]
 
 

@@ -499,6 +499,124 @@ def margin_calls(as_of: dt.date | None = None, status: str | None = None) -> lis
 # --- FTP ------------------------------------------------------------------
 
 
+@router.get("/curves/zero", tags=["curves"])
+def zero_curve(as_of: dt.date | None = None, method: str | None = None) -> list[dict]:
+    """The zero-coupon curve, both constructions.
+
+    BOOTSTRAP is exact where something traded but silent between its nodes and
+    flat beyond the last one. NSS is smooth and extrapolates but does not reprice
+    every bond exactly. `is_extrapolated` marks where each one is reaching.
+    """
+    return fetch(
+        """
+        SELECT as_of_date, method, tenor_years, discount_factor, zero_rate_pct,
+               forward_rate_pct, is_extrapolated
+        FROM zero_curve_point
+        WHERE as_of_date = COALESCE(
+                  %(as_of)s::DATE, (SELECT MAX(as_of_date) FROM zero_curve_point))
+          AND (%(method)s::TEXT IS NULL OR method = %(method)s)
+        ORDER BY method, tenor_years
+        """,
+        {"as_of": as_of, "method": method},
+    )
+
+
+@router.get("/curves/nss", tags=["curves"])
+def nss_parameters(date_from: dt.date | None = None) -> list[dict]:
+    """The fitted Nelson-Siegel-Svensson parameters.
+
+    The reason to prefer a parametric curve: beta0 is the long level, beta0+beta1
+    the short rate, beta2/beta3 the two curvatures, and rmse_bps says whether to
+    trust any of it. `description` is the curve in words.
+    """
+    return fetch(
+        """
+        SELECT as_of_date, beta0, beta1, beta2, beta3, tau1, tau2,
+               short_rate_pct, rmse_bps, observations, description
+        FROM nss_fit
+        WHERE %(date_from)s::DATE IS NULL OR as_of_date >= %(date_from)s
+        ORDER BY as_of_date DESC
+        """,
+        {"date_from": date_from},
+    )
+
+
+@router.get("/curves/observations", tags=["curves"])
+def curve_observations(as_of: dt.date | None = None) -> list[dict]:
+    """The prints each curve was built from, so a curve is always traceable.
+
+    `nse_ytm_pct` is the exchange's own figure alongside ours -- for T-bills our
+    simple ACT/365 yield reproduces it to a median 0.002bp.
+    """
+    return fetch(
+        """
+        SELECT as_of_date, isin, instrument_type, security_code, observed_on,
+               settlement_date, tenor_years, dirty_price, ytm_pct, nse_ytm_pct
+        FROM curve_observation
+        WHERE as_of_date = COALESCE(
+                  %(as_of)s::DATE, (SELECT MAX(as_of_date) FROM curve_observation))
+        ORDER BY tenor_years
+        """,
+        {"as_of": as_of},
+    )
+
+
+@router.get("/slb/implied-forwards", tags=["slb"])
+def implied_forwards(
+    as_of: dt.date | None = None,
+    signal: str | None = None,
+    symbol: str | None = None,
+    limit: Limit = 200,
+) -> list[dict]:
+    """The SLB fee curve read as a forward curve.
+
+    A spot fee says a name is expensive now; the forward says whether the market
+    expects it to STAY expensive. PIIND quoting 51.1% to 15 days and 19.3% to 43
+    implies about 2% over the 28 days between -- the squeeze is priced to be over.
+
+    FRONT_LOADED means a negative forward: the whole cost sits in the near
+    window. It is NOT an arbitrage, because rolling an SLB contract means
+    trading a fresh one at a new market fee.
+    """
+    return fetch(
+        """
+        SELECT trade_date, symbol, contract_set, near_tenor_days, far_tenor_days,
+               near_fee_pct, far_fee_pct, implied_forward_pct, signal
+        FROM slb_implied_forward
+        WHERE trade_date = COALESCE(
+                  %(as_of)s::DATE, (SELECT MAX(trade_date) FROM slb_implied_forward))
+          AND (%(signal)s::TEXT IS NULL OR signal = %(signal)s)
+          AND (%(symbol)s::TEXT IS NULL OR symbol = %(symbol)s)
+        ORDER BY near_fee_pct DESC
+        LIMIT %(limit)s
+        """,
+        {"as_of": as_of, "signal": signal, "symbol": symbol, "limit": limit},
+    )
+
+
+@router.get("/repo/key-rate-dv01", tags=["repo"])
+def key_rate_dv01(as_of: dt.date | None = None) -> list[dict]:
+    """Curve risk on the collateral, bucketed by key tenor.
+
+    A parallel DV01 cannot tell a ten-year position from a barbell of twos and
+    thirties with the same total, and a book that is DV01-neutral overall can
+    still be badly exposed to a steepening. Buckets are additive, so a
+    desk-level exposure is a plain sum.
+    """
+    return fetch(
+        """
+        SELECT as_of_date, key_tenor_years, SUM(dv01_inr) AS dv01_inr,
+               COUNT(DISTINCT isin) AS positions
+        FROM key_rate_dv01_daily
+        WHERE as_of_date = COALESCE(
+                  %(as_of)s::DATE, (SELECT MAX(as_of_date) FROM key_rate_dv01_daily))
+        GROUP BY as_of_date, key_tenor_years
+        ORDER BY key_tenor_years
+        """,
+        {"as_of": as_of},
+    )
+
+
 @router.get("/ftp/curve", tags=["ftp"])
 def ftp_curve(as_of: dt.date | None = None) -> list[dict]:
     """`is_estimated` marks extrapolated nodes. The short end usually is: SLB

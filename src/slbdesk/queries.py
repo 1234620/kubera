@@ -26,6 +26,8 @@ VALIDATIONS = (
     "validate_ftp_zero",
     "validate_ftp_reconciliation",
     "validate_matched_book_pays_little_ftp",
+    "validate_zero_curve",
+    "validate_nss_fit",
 )
 
 
