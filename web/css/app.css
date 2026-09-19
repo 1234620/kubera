@@ -1,0 +1,484 @@
+/* Layout, gradients and motion. Palette lives in tokens.css.
+   Design: docs/09-frontend.md. Rules: rules/FRONTEND.md. */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font);
+  color: var(--text);
+  background-color: var(--bg);
+  overflow-x: hidden;
+}
+
+/* A layered radial mesh on a slow drift. Motion you notice only if you look,
+   which is the right amount for a screen someone stares at all day. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -30vmax;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38vmax 38vmax at 12% 8%,  color-mix(in oklab, var(--accent) 26%, transparent), transparent 70%),
+    radial-gradient(34vmax 34vmax at 88% 14%, color-mix(in oklab, var(--accent-2) 22%, transparent), transparent 70%),
+    radial-gradient(42vmax 42vmax at 62% 92%, color-mix(in oklab, var(--accent-3) 16%, transparent), transparent 70%);
+  filter: blur(18px);
+  opacity: .5;
+  animation: drift 44s var(--ease) infinite alternate;
+}
+
+@keyframes drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(2.5%, -2%, 0) scale(1.06); }
+  100% { transform: translate3d(-2%, 2.5%, 0) scale(1.02); }
+}
+
+.shell {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) 64px;
+}
+
+/* --- header --------------------------------------------------------------- */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 20px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+  font-weight: 620;
+  letter-spacing: -.02em;
+  background: linear-gradient(94deg, var(--text) 10%, var(--accent) 55%, var(--accent-2) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.masthead .sub {
+  font-size: .78rem;
+  color: var(--text-faint);
+  letter-spacing: .01em;
+}
+
+.masthead .spacer { flex: 1 1 auto; }
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--text-dim);
+}
+
+.stamp .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pos);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--pos) 70%, transparent);
+  animation: beat 2.6s var(--ease) infinite;
+}
+
+.stamp .dot.bad { background: var(--neg); animation: none; }
+
+@keyframes beat {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--pos) 60%, transparent); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* --- KPI strip ------------------------------------------------------------ */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+/* A 1px gradient border via two backgrounds and background-clip, which keeps
+   the card corners crisp where a pseudo-element border would not. */
+.kpi {
+  position: relative;
+  padding: 15px 17px 13px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(152deg, var(--surface-raised), var(--surface)) padding-box,
+    linear-gradient(152deg,
+      color-mix(in oklab, var(--kpi-accent, var(--accent)) 62%, transparent),
+      var(--border) 55%) border-box;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .32), 0 10px 26px -18px rgb(0 0 0 / .7);
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+  animation: rise .5s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 65ms);
+  overflow: hidden;
+}
+
+.kpi::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent,
+    var(--kpi-accent, var(--accent)), transparent);
+  opacity: .8;
+}
+
+.kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgb(0 0 0 / .34), 0 20px 40px -22px rgb(0 0 0 / .8);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.kpi .label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .66rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.kpi .value {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: clamp(1.2rem, 2.3vw, 1.6rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+}
+
+.kpi .foot {
+  margin-top: 2px;
+  font-size: .7rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi .spark { display: block; width: 100%; height: 30px; margin-top: 9px; }
+
+/* An estimate must never look measured (docs/07 §2). */
+.tag-est {
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in oklab, var(--warn) 45%, transparent);
+  background: color-mix(in oklab, var(--warn) 14%, transparent);
+  color: var(--warn);
+  font-size: .58rem;
+  letter-spacing: .06em;
+}
+
+/* --- panels --------------------------------------------------------------- */
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 1080px) {
+  .grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(168deg, var(--surface-raised), var(--surface) 65%);
+  box-shadow: 0 10px 30px -24px rgb(0 0 0 / .8);
+  overflow: hidden;
+  animation: rise .55s var(--ease) both;
+  animation-delay: 180ms;
+}
+
+.panel > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--accent) 7%, transparent), transparent 55%);
+}
+
+.panel > header h2 {
+  margin: 0;
+  font-size: .8rem;
+  font-weight: 620;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.panel > header .note {
+  font-size: .7rem;
+  color: var(--text-faint);
+}
+
+.panel > header .spacer { flex: 1 1 auto; }
+
+.panel .body { padding: 14px 16px 16px; }
+
+.chart-wrap { position: relative; height: 262px; }
+
+/* --- controls ------------------------------------------------------------- */
+
+select,
+input[type="search"] {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: .74rem;
+  transition: border-color .15s var(--ease);
+}
+
+select:focus-visible,
+input[type="search"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* --- specialness heatmap -------------------------------------------------- */
+
+.heat {
+  display: grid;
+  gap: 3px;
+  grid-template-columns: 92px repeat(var(--cols, 8), minmax(0, 1fr));
+  font-family: var(--mono);
+  font-size: .64rem;
+}
+
+.heat .col-head,
+.heat .row-head {
+  color: var(--text-faint);
+  font-size: .6rem;
+  letter-spacing: .04em;
+  display: flex;
+  align-items: center;
+}
+
+.heat .col-head { justify-content: center; padding-bottom: 2px; }
+.heat .row-head { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.heat .cell {
+  position: relative;
+  min-height: 24px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: var(--on-heat);
+  font-weight: 640;
+  cursor: default;
+  animation: fade .5s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 7ms);
+  transition: transform .13s var(--ease), outline-color .13s var(--ease);
+  outline: 1px solid transparent;
+}
+
+.heat .cell:hover {
+  transform: scale(1.09);
+  outline-color: var(--text);
+  z-index: 2;
+}
+
+.heat .cell.empty {
+  background: color-mix(in oklab, var(--border) 45%, transparent);
+  animation: none;
+}
+
+/* "No recent print" is information about liquidity, so a stale cell is hatched
+   and dimmed rather than dropped (docs/07 §4). */
+.heat .cell.stale {
+  opacity: .58;
+  background-image: repeating-linear-gradient(45deg,
+    rgb(0 0 0 / .32) 0 2px, transparent 2px 5px);
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: scale(.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: .64rem;
+  color: var(--text-faint);
+}
+
+.legend .ramp {
+  flex: 0 0 132px;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--spec-0), var(--spec-1),
+    var(--spec-2), var(--spec-3), var(--spec-4));
+}
+
+/* --- blotter -------------------------------------------------------------- */
+
+.table-scroll { max-height: 470px; overflow: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .74rem;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 10px;
+  text-align: right;
+  font-size: .62rem;
+  font-weight: 620;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+thead th:first-child,
+thead th.left { text-align: left; }
+
+tbody td {
+  padding: 7px 10px;
+  text-align: right;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+tbody td.left { text-align: left; font-family: var(--font); }
+
+tbody tr {
+  animation: rowin .42s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 16ms);
+  transition: background-color .13s var(--ease);
+}
+
+tbody tr:hover { background: var(--surface-hover); }
+
+@keyframes rowin {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* A position with an open margin call pulses, so it is findable in a long table
+   without relying on colour alone. */
+tbody tr.called { animation: rowin .42s var(--ease) both, called 2.1s var(--ease) 3; }
+
+@keyframes called {
+  0%, 100% { background-color: transparent; }
+  50%      { background-color: color-mix(in oklab, var(--warn) 16%, transparent); }
+}
+
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.dim { color: var(--text-faint); }
+
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: .6rem;
+  font-weight: 640;
+  letter-spacing: .05em;
+}
+
+.pill.gc   { background: color-mix(in oklab, var(--spec-0) 55%, transparent); color: var(--text); }
+.pill.warm { background: color-mix(in oklab, var(--spec-2) 30%, transparent); color: var(--spec-2); }
+.pill.spec { background: color-mix(in oklab, var(--spec-3) 26%, transparent); color: var(--spec-3); }
+.pill.htb  { background: color-mix(in oklab, var(--spec-4) 28%, transparent); color: var(--spec-4); }
+
+/* --- loading -------------------------------------------------------------- */
+
+/* A skeleton in the shape of the eventual content, so nothing jumps when data
+   lands. Never a spinner. */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(100deg,
+    var(--surface) 20%, var(--surface-hover) 40%, var(--surface) 60%);
+  background-size: 260% 100%;
+  animation: shimmer 1.35s linear infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 180% 0; }
+  to   { background-position: -80% 0; }
+}
+
+.skeleton.line { height: 12px; margin: 7px 0; }
+.skeleton.block { height: 230px; }
+
+.error {
+  padding: 14px 16px;
+  border: 1px solid color-mix(in oklab, var(--neg) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--neg) 9%, transparent);
+  color: var(--neg);
+  font-size: .78rem;
+}
+
+footer.credits {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: .7rem;
+  color: var(--text-faint);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+footer.credits a { color: var(--text-dim); }
+
+/* --- accessibility floor -------------------------------------------------- */
+
+/* Not an optional extra (rules/FRONTEND.md). Motion off, final state kept. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  body::before { animation: none; }
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }

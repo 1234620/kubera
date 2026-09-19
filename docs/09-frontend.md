@@ -65,10 +65,22 @@ score scale in OKLCH so the ramp is perceptually even (a naive HSL ramp bunches 
 in the greens and misleads the eye). Staleness is rendered as reduced opacity plus
 a diagonal hatch, never as a missing cell — "no recent print" is information.
 
-**Term structure** — Chart.js line with a canvas `createLinearGradient` fill, one
-series per selected symbol, `tension: 0.3`. The axis is **tenor in days**, not
-series code, so the curve's shape is true to the tenors rather than to an
-alphabetical ordering of codes.
+Columns are **tenor buckets**, not exact tenor days. That was a correction, not
+the original plan: a typical security quotes at only one or two exact tenors, so a
+symbol × exact-tenor grid came out about 10% filled and read as a broken chart.
+The buckets are the ones the score is already ranked within, and the grid is ~47%
+filled — where an empty cell now genuinely means "this name does not quote at that
+tenor", which is itself information about the market's shape.
+
+**Term structure** — Chart.js line with a canvas `createLinearGradient` fill,
+`tension: 0.3`, and the axis in **tenor days** rather than series code so the
+curve's shape is true to the tenors and not to an alphabetical ordering of codes.
+
+**One line per contract set.** The regular and non-foreclosing sets are separate
+curves; a single dataset spanning both doubles back on itself and the shape
+becomes a lie. This project hit that same trap three times — in the SQL window
+frame for `LAST_VALUE`, in the specialness monotonicity test, and here — which is
+why the contract set is now part of every grouping key by reflex.
 
 **Blotter** — staggered row entry (`animation-delay: calc(var(--i) * 18ms)`),
 positive/negative spreads coloured from the token palette, and a 2 s pulse on any
@@ -95,6 +107,19 @@ Semantic tokens: `--bg`, `--surface`, `--surface-raised`, `--border`, `--text`,
 
 Gain/loss are **not** bare red and green — they are adjusted for deuteranopia and
 paired with sign and position so colour is never the only channel carrying meaning.
+
+## What checks it
+
+`tests/test_frontend.py` is a linter for this document: it asserts there is no
+build step, no login anywhere in `web/`, no colour literal outside `tokens.css`,
+that the specialness ramp is OKLCH, that `prefers-reduced-motion` is honoured in
+the CSS *and* in the count-up *and* in the chart configs, that the required
+`@keyframes` exist, that only the allowed CDNs are referenced, that money is
+formatted `en-IN`, and that the annualisation formula does not appear
+client-side — because the frontend formats and draws, it does not compute.
+
+It earned its place immediately by catching a hardcoded `#06080f` in `app.css`,
+which is exactly the rule it exists to enforce.
 
 ## Behaviour
 

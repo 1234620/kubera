@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SLB &amp; Repo Financing Desk</title>
+<meta name="description" content="Securities lending and repo financing desk analytics on real NSE data.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="shell">
+
+  <header class="masthead">
+    <h1>SLB &amp; Repo Financing Desk</h1>
+    <span class="sub">NSE Securities Lending &amp; Borrowing · G-Sec repo · Funds Transfer Pricing</span>
+    <span class="spacer"></span>
+    <span class="stamp">
+      <span class="dot" id="stamp-dot"></span>
+      <span id="stamp-text">end of day</span>
+      <strong id="stamp-date">…</strong>
+    </span>
+  </header>
+
+  <!-- Band 1: KPI strip -->
+  <section class="kpis" id="kpis" aria-label="Book summary">
+    <div class="kpi skeleton" style="height:118px"></div>
+    <div class="kpi skeleton" style="height:118px"></div>
+    <div class="kpi skeleton" style="height:118px"></div>
+    <div class="kpi skeleton" style="height:118px"></div>
+    <div class="kpi skeleton" style="height:118px"></div>
+    <div class="kpi skeleton" style="height:118px"></div>
+  </section>
+
+  <div class="grid-2">
+    <!-- Band 2: specialness -->
+    <section class="panel">
+      <header>
+        <h2>Specialness</h2>
+        <span class="note">score by security &amp; tenor bucket · hatched = stale quote</span>
+      </header>
+      <div class="body">
+        <div class="heat" id="heat"><div class="skeleton block" style="grid-column:1/-1"></div></div>
+        <div class="legend">
+          <span>GC</span><span class="ramp"></span><span>hard to borrow</span>
+          <span class="spacer" style="flex:1"></span>
+          <span>hover a cell for both score components</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Band 3: term structure -->
+    <section class="panel">
+      <header>
+        <h2>Fee term structure</h2>
+        <label class="note" for="ts-symbol">symbol</label>
+        <select id="ts-symbol" aria-label="Symbol for the term structure"></select>
+        <span class="spacer"></span>
+        <span class="note" id="ts-note"></span>
+      </header>
+      <div class="body">
+        <div class="chart-wrap"><canvas id="ts-canvas"></canvas></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid-2">
+    <!-- Band 3b: the funding curve the FTP model prices off -->
+    <section class="panel">
+      <header>
+        <h2>Funding curve</h2>
+        <span class="spacer"></span>
+        <span class="note" id="curve-note"></span>
+      </header>
+      <div class="body">
+        <div class="chart-wrap"><canvas id="curve-canvas"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Band 3c: the decomposition that has to add up -->
+    <section class="panel">
+      <header>
+        <h2>Desk &amp; treasury split</h2>
+        <span class="note">a matched book pays no FTP; a directional one pays for its balance sheet</span>
+      </header>
+      <div class="body">
+        <table>
+          <thead>
+            <tr>
+              <th class="left">Desk</th><th>Pos</th><th>Gross</th><th>Net</th>
+              <th>Fee</th><th>FTP</th><th>Desk spread</th><th>Treasury</th><th>Net</th>
+            </tr>
+          </thead>
+          <tbody id="desks"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Band 4: blotter -->
+  <section class="panel">
+    <header>
+      <h2>Blotter</h2>
+      <label class="note" for="bl-desk">desk</label>
+      <select id="bl-desk" aria-label="Filter by desk"></select>
+      <input type="search" id="bl-search" placeholder="symbol…" aria-label="Filter by symbol">
+      <span class="spacer"></span>
+      <span class="note" id="bl-count"></span>
+    </header>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">Symbol</th><th class="left">Series</th><th class="left">Side</th>
+            <th>Qty</th><th>Notional</th><th>Tenor</th><th>Fee % p.a.</th>
+            <th>Special</th><th>FTP %</th><th>Fee ₹/day</th><th>FTP ₹/day</th>
+          </tr>
+        </thead>
+        <tbody id="blotter"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="credits">
+    <span>Market data: NSE &amp; NSE Clearing, for education only. The book is synthetic.</span>
+    <span>Fees are ₹/share for the contract period, annualised ACT/365.</span>
+    <a href="/docs">API docs</a>
+    <a href="/api/data-coverage">data coverage</a>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

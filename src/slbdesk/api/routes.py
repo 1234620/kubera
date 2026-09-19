@@ -236,6 +236,17 @@ def book_kpis(as_of: dt.date | None = None) -> dict:
     return one(queries.sql("book_kpis"), {"as_of": as_of}, "no book data")
 
 
+@router.get("/book/history", tags=["book"])
+def book_history() -> list[dict]:
+    """The daily series behind the KPI sparklines.
+
+    Exists so the browser draws a series it is handed rather than aggregating
+    positions itself: the frontend formats and draws, it does not compute
+    (rules/FRONTEND.md).
+    """
+    return named("book_history")
+
+
 @router.get("/book/positions", tags=["book"])
 def positions(
     desk: str | None = None,

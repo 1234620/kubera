@@ -47,6 +47,7 @@ LIST_ENDPOINTS = [
     "/api/book/positions?limit=5",
     "/api/book/positions?desk=EQ_FIN",
     "/api/book/pnl",
+    "/api/book/history",
     "/api/book/pnl?desk=TREASURY",
     "/api/bonds?limit=5",
     "/api/bonds?instrument_type=GS",
