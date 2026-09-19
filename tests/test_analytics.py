@@ -153,10 +153,44 @@ def test_gc_benchmark_sits_below_the_specials(loaded):
 # --- specialness ----------------------------------------------------------
 
 
-def test_specialness_covers_open_positions_not_just_todays_prints(loaded):
-    """~230 of ~800 open pairs print on a given day; the rest still hold risk."""
-    scored = conn_count(loaded, "slb_specialness_daily")
-    printed = conn_count(loaded, "slb_quote_daily")
+def test_specialness_scores_open_positions_not_quotes(loaded):
+    """Every scored row is a position we hold exposure to, not a quote.
+
+    The universe is slb_open_position joined to the last known fee, so a quote in
+    a series with no open interest must not produce a score.
+    """
+    orphans = rows(
+        loaded,
+        """
+        SELECT s.symbol, s.series_code
+        FROM slb_specialness_daily AS s
+        LEFT JOIN slb_open_position AS o
+            ON o.trade_date = s.trade_date
+           AND o.symbol = s.symbol
+           AND o.series_code = s.series_code
+        WHERE o.symbol IS NULL
+        """,
+    )
+    assert not orphans
+
+
+def test_specialness_outgrows_todays_prints_once_there_is_history(loaded):
+    """~230 of ~800 open pairs print on a given day; the rest still hold risk.
+
+    Needs history: with a single date loaded, most open pairs have no prior print
+    to carry forward, so the carried-forward universe is necessarily smaller than
+    the day's quote count. The property only has meaning across a backfill.
+    """
+    if date_count(loaded) < 20:
+        pytest.skip("needs a real backfill; run `make ingest`")
+
+    latest = loaded.execute("SELECT MAX(trade_date) FROM slb_specialness_daily").fetchone()[0]
+    scored = loaded.execute(
+        "SELECT COUNT(*) FROM slb_specialness_daily WHERE trade_date = %s", (latest,)
+    ).fetchone()[0]
+    printed = loaded.execute(
+        "SELECT COUNT(*) FROM slb_quote_daily WHERE trade_date = %s", (latest,)
+    ).fetchone()[0]
     assert scored > printed
 
 
@@ -216,25 +250,39 @@ def test_staleness_flag_matches_the_quote_age(loaded):
         assert row["is_stale"] == (row["days_since_last_trade"] > 3)
 
 
-def test_specialness_rises_with_the_fee_within_a_tenor_bucket(loaded):
-    """Inside a bucket the score must be monotone in the fee, or it is not a
-    ranking of scarcity at all."""
+def test_specialness_rises_with_the_fee_within_a_partition(loaded):
+    """Inside one ranking partition the score must be monotone in the fee.
+
+    The partition is (trade_date, contract_set, tenor_bucket) -- ALL THREE. A
+    tenor bucket spans both contract sets, each ranked separately, so comparing
+    across them interleaves two independent percentile scales and monotonicity
+    correctly fails. Same trap as the term-structure curve.
+    """
+    partition = loaded.execute(
+        """
+        SELECT contract_set, tenor_bucket
+        FROM slb_specialness_daily
+        WHERE trade_date = %s AND own_z IS NULL
+        GROUP BY contract_set, tenor_bucket
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+        """,
+        (DATE,),
+    ).fetchone()
+    if partition is None:
+        pytest.skip("no partition without history on this date")
+
     bucket = rows(
         loaded,
         """
         SELECT fee_annualised_pct, specialness_score
         FROM slb_specialness_daily
-        WHERE trade_date = %s
-          AND tenor_bucket = (
-              SELECT tenor_bucket FROM slb_specialness_daily
-              WHERE trade_date = %s
-              GROUP BY tenor_bucket ORDER BY COUNT(*) DESC LIMIT 1
-          )
-          AND own_z IS NULL
+        WHERE trade_date = %s AND contract_set = %s AND tenor_bucket = %s AND own_z IS NULL
         ORDER BY fee_annualised_pct
         """,
-        (DATE, DATE),
+        (DATE, partition[0], partition[1]),
     )
+    assert len(bucket) > 5
     scores = [float(r["specialness_score"]) for r in bucket]
     assert scores == sorted(scores)
 

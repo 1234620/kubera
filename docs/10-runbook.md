@@ -33,6 +33,7 @@ open http://localhost:8000
 | `seed` | Generate the synthetic book from real quotes. Idempotent; truncates and regenerates. Seeded, so it reproduces |
 | `analytics` | Refresh derived tables, then run every validation query |
 | `test` | Full suite in the container, so the Postgres tests run. `test-local` runs on the host and skips them |
+| `test-ci` | Reproduces CI: a throwaway database holding only the committed fixtures. Use this before pushing — a suite that passes against a full backfill can still fail in CI, because tests that need history must skip rather than assume it |
 | `lint` | `ruff check` and `ruff format --check` |
 | `psql` | Open a shell on the database |
 | `reset` | Drop and recreate the database. Asks first |
