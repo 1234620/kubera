@@ -1,0 +1,360 @@
+# 07 — Analytics specification
+
+Every metric the system produces, with its formula, units, grain, and the file that
+implements it. If a number appears on the dashboard and is not in this document,
+that is a bug in one of the two.
+
+Notation: fees are `f` in **₹/share for the contract period**; `q` is quantity in
+shares; `P` is the underlying share price in ₹; `d` is days.
+
+---
+
+## 1. Basis and units
+
+The single most important conversion in this project. NSE quotes the SLB fee as
+rupees per share **for the whole contract**, but every desk metric, every
+comparison across tenors, and the entire FTP model need an **annualised rate on
+notional**. Comparing a 1-month series fee to a 12-month series fee without
+annualising is meaningless, and it is the mistake this section exists to prevent.
+
+```
+notional            = q × P                                  [₹]
+fee_amount          = q × f                                   [₹]
+fee_annualised_pct  = (f / P) × (365 / d) × 100               [% p.a.]
+```
+
+where `d = reverse_leg_date − first_leg_settle_date` in **actual calendar days**
+(ACT/365), and `P` is the underlying cash-market close on the same date.
+
+`P` is not in the SLB files. It comes from the NSE cash-market bhavcopy, which
+the ingest layer also pulls for exactly this reason — without it, nothing here can
+be annualised.
+
+**Implementation**: `db/queries/fee_basis.sql`, grain day × symbol × series.
+Output columns: `fee_per_share`, `underlying_close`, `tenor_days`,
+`fee_annualised_pct`, `notional_inr`.
+
+---
+
+## 2. Utilisation
+
+```
+utilisation_pct = on_loan_qty / lendable_qty × 100
+```
+
+- **`on_loan_qty`** — `SUM(outstanding_qty)` from `slb_open_position` for the day,
+  across all series. Real, from the file.
+- **`lendable_qty`** — *not published*. Estimated as
+  `free_float_shares × lendable_participation_rate`, with free float proxied from
+  the MWPL disclosed in the eligibility criteria and the participation rate set at
+  a documented constant. **`is_estimated = TRUE` on every row**, and the API
+  response carries the flag through to the dashboard, which labels it.
+
+Interpretation: utilisation is the standard industry supply-and-demand gauge —
+on-loan value over total lendable inventory. Rising utilisation against a shrinking
+lendable base is the leading indicator that a name is about to go special; the fee
+is the lagging confirmation.
+
+**Implementation**: `db/queries/utilisation.sql`. Window use: `LAG()` over
+`(symbol ORDER BY trade_date)` for the daily change, and a 5-day moving average
+for the trend column.
+
+### 2.1 Days to cover
+
+```
+days_to_cover = on_loan_qty / avg_daily_cash_volume_20d
+```
+
+How many normal trading days it would take to buy back the borrowed stock. High
+days-to-cover plus high utilisation is a squeeze setup. `db/queries/days_to_cover.sql`.
+
+---
+
+## 3. The GC benchmark
+
+Specialness is relative, so there has to be something to be relative *to*. Equity
+SLB has no published GC rate, so we define one and document it rather than borrowing
+a number from a different market.
+
+**Definition**: the **quantity-weighted median** `fee_annualised_pct` across the
+day's *liquid cohort* — rows where `num_trades ≥ 3` and `traded_qty ≥ 1000` — for
+the same `contract_set`, restricted to the nearest three series by tenor.
+
+Median, not mean, because the fee distribution is severely right-skewed: a handful
+of hard-to-borrow names at 40% p.a. would drag a mean benchmark up and make
+genuinely special names look ordinary. Quantity-weighted because a 100-share print
+should not move the market benchmark.
+
+`cohort_size` is stored alongside. Below 20 members the benchmark is flagged
+`is_estimated`, because a median of twelve observations is not a market rate.
+
+**Implementation**: `db/queries/gc_benchmark.sql` → `gc_rate_daily`.
+Uses `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ...)`.
+
+---
+
+## 4. Specialness score
+
+The headline metric. Two components, deliberately, so the number can be defended:
+a name can look expensive *relative to the market today* or *relative to its own
+history*, and those are different statements.
+
+### Component A — cross-sectional percentile
+
+```
+xs_percentile = PERCENT_RANK() OVER (
+    PARTITION BY trade_date, contract_set, series_bucket
+    ORDER BY fee_annualised_pct
+)
+```
+
+Where does this name's fee sit against every other name at the same tenor today?
+Range 0–1. Robust to the whole market repricing, which is its job.
+
+### Component B — own-history z-score
+
+```
+baseline_mean = AVG(fee_annualised_pct) OVER (
+    PARTITION BY symbol
+    ORDER BY trade_date
+    ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING
+)
+baseline_sd   = STDDEV_SAMP(...) OVER (same frame)
+
+own_z = (fee_annualised_pct − baseline_mean) / NULLIF(baseline_sd, 0)
+```
+
+The frame **excludes today** (`1 PRECEDING`), so today's observation is measured
+against a baseline it did not contribute to. Including it damps exactly the spike
+you are trying to detect.
+
+`own_z` is winsorised to ±5 before blending — a name coming off a 20-day run of
+identical fees has a near-zero standard deviation, which produces an absurd z
+without the clamp.
+
+### The blend
+
+```
+specialness_score = 100 × (0.6 × xs_percentile + 0.4 × norm_cdf(own_z))
+```
+
+Range 0–100. `norm_cdf` maps the z-score onto 0–1 so the two components are on the
+same scale before weighting. The 60/40 weighting favours the cross-sectional view
+because it is computed from more observations on any given day; the weights are
+named constants in the SQL header, not magic numbers in the middle of an
+expression.
+
+Both components **and** the final score are stored. "Score 87" is not an answer;
+"87, because it's in the 94th percentile of 1-month fees and 2.1 standard
+deviations above its own 20-day mean" is.
+
+### Classification
+
+| Band | Score | Reading |
+| --- | --- | --- |
+| `GC` | < 50 | General collateral; trades near the benchmark |
+| `WARM` | 50 – 75 | Demand building; worth watching |
+| `SPECIAL` | 75 – 90 | Scarce; fee materially above cohort and history |
+| `HARD_TO_BORROW` | ≥ 90 | Squeeze territory |
+
+Thresholds are declared **once**, here, and referenced from the SQL header. They
+are not duplicated in Python, in the API, or in the frontend.
+
+### Staleness guard
+
+Only ~230 of ~800 open `(symbol, series)` pairs trade on a given day. A fee that
+last printed nine days ago is not today's market. Every row carries
+`days_since_last_trade`, and a score computed on a quote older than **three trading
+days** is returned with `is_stale = TRUE`. The dashboard greys those cells rather
+than dropping them, because "no recent print" is itself information about liquidity.
+
+**Implementation**: `db/queries/specialness.sql` → `slb_specialness_daily`.
+
+---
+
+## 5. Financing spread P&L
+
+The desk's actual money. Decomposed so each line is attributable to a decision
+someone made.
+
+Per position, per day:
+
+```
+tenor_days        = reverse_leg_date − first_leg_settle_date
+daily_fee_accrual = q × f / tenor_days                            [₹/day]
+```
+
+Straight-line accrual over the contract, ACT/365, starting at **first-leg
+settlement** — not trade date. Starting at trade date overstates the accrual by one
+day on every trade in the book.
+
+```
+fee_income        = +daily_fee_accrual        if side = LEND      [₹/day]
+borrow_cost       = −daily_fee_accrual        if side = BORROW    [₹/day]
+ftp_charge        = −notional × ftp_rate_pct / 100 / 365          [₹/day]
+gross_spread      = fee_income + borrow_cost
+net_spread        = gross_spread + ftp_charge
+```
+
+**Sign convention: positive is a gain to our book, always.** A borrow cost is a
+negative number, not a positive number you subtract. Half the sign errors in P&L
+code come from mixing those two styles in one file.
+
+### Attribution
+
+`net_spread` is split into three named effects, which is what a desk head actually
+asks for:
+
+| Effect | Formula | Question it answers |
+| --- | --- | --- |
+| **Fee spread** | `q × (f_lend − f_borrow) / tenor_days` | Did we price the trade well? |
+| **Term spread** | `notional × (curve(t_long) − curve(t_short)) / 100 / 365` | Did we get paid for the maturity mismatch? |
+| **Funding drag** | `ftp_charge` | What did the balance sheet cost? |
+
+These three must sum to `net_spread`. `tests/test_pnl_attribution.py` asserts it to
+₹0.01 per position.
+
+**Implementation**: `db/queries/position_pnl.sql` → `slb_position_pnl_daily`.
+Window use: `SUM(net_spread) OVER (PARTITION BY desk_id ORDER BY as_of_date)` for
+running desk P&L, and `SUM(...) OVER (PARTITION BY desk_id, DATE_TRUNC('month', ...))`
+for month-to-date.
+
+---
+
+## 6. Term structure of lending fees
+
+Grain: day × symbol × tenor bucket. `fee_annualised_pct` by tenor, so the shape can
+be read.
+
+An **upward-sloping** fee curve says the market expects the borrow to stay tight —
+lenders demand more to commit for longer. **Downward-sloping** says today's demand
+is a transient event with an expected resolution date (an index rebalance, a record
+date, a merger closing). That shape is a trade signal, and it is the chart that
+makes the dashboard worth looking at.
+
+Endpoints via `FIRST_VALUE` / `LAST_VALUE` with an explicit
+`ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING` frame — the default
+frame silently gives the wrong `LAST_VALUE`, which is the classic window-function
+trap and is called out in the query header.
+
+```
+term_slope_bps = (fee_ann_longest − fee_ann_shortest) × 100
+```
+
+**Implementation**: `db/queries/term_structure.sql`.
+
+---
+
+## 7. Bond analytics
+
+Pure functions, `src/slbdesk/bonds/`. Formulas in
+[`03-domain-bond-math.md`](03-domain-bond-math.md); this is the register of outputs.
+
+| Output | Unit | Function |
+| --- | --- | --- |
+| `accrued_interest` | ₹ per ₹100 face | `accrued_interest()` — 30/360 |
+| `dirty_price` | ₹ per ₹100 face | `dirty_from_clean()` |
+| `ytm_pct` | % p.a. semi-annual | `solve_ytm()` — Newton, bisection fallback |
+| `macaulay_duration` | years | `macaulay_duration()` |
+| `modified_duration` | years | `modified_duration()` |
+| `convexity` | years² | `convexity()` |
+| `dv01` | ₹ per ₹100 face per bp | `dv01()` — unsigned; sign applied at position level |
+
+→ `gsec_analytics_daily`, joined to `gsec_trade_daily` for prices and `gsec` for terms.
+
+---
+
+## 8. Repo analytics
+
+| Output | Formula | Unit |
+| --- | --- | --- |
+| `dirty_value` | `nominal / 100 × (clean_price + accrued_interest)` | ₹ |
+| `haircut` | `slb_var_margin.total_margin_pct / 100` for equities; tenor-banded model for G-Secs | decimal |
+| `post_haircut_value` | `dirty_value × (1 − haircut)` | ₹ |
+| `repurchase_price` | `purchase_price × (1 + repo_rate_pct / 100 × d / 365)` | ₹ |
+| `accreted_value` | `purchase_price × (1 + repo_rate_pct / 100 × d_elapsed / 365)` | ₹ |
+| `net_exposure` | `accreted_value − post_haircut_value` | ₹ |
+| `shortfall` | `GREATEST(net_exposure − threshold, 0)` | ₹ |
+| `call_amount` | `shortfall` rounded **up** to the minimum transfer amount | ₹ |
+
+G-Sec haircut model, bands documented so the number is not a plug:
+
+| Residual maturity | Haircut |
+| --- | --- |
+| ≤ 1 year | 0.50% |
+| 1 – 5 years | 1.50% |
+| 5 – 10 years | 2.50% |
+| > 10 years | 4.00% |
+
+Calibrated as roughly a 5-day 99% VaR from the tenor band's DV01 and observed yield
+volatility — the same shape CCIL uses (security-specific VaR over a 5-day holding
+period, stepped up for illiquidity). `haircut_source` records which path produced
+each row.
+
+`due_at` is 09:00 on the next business day, per the CCIL TREPS rule.
+
+**Implementation**: `db/queries/repo_margin.sql`, `src/slbdesk/repo/`.
+
+---
+
+## 9. FTP
+
+Formulas in [`04-domain-ftp.md`](04-domain-ftp.md).
+
+```
+ftp_rate_pct = base_curve(tenor_days) + tlp(tenor_days) + contingent_liquidity_bps/100
+ftp_charge   = position_value × ftp_rate_pct / 100 / 365
+```
+
+Contingent liquidity charge: **15 bps** on the portion of a position in a series
+where `recall_eligibility = 'D'` in `slb_eligibility`, zero otherwise. A position
+that cannot be unwound early consumes liquidity a recallable one does not, and the
+NSE file tells us which is which — so the driver is data, not an assumption.
+
+Curve build: T-bill yields (`SECTYPE = 'TB'`) for tenors under a year, G-Sec yields
+beyond, log-linear interpolation on discount factors, plus a documented constant
+issuer spread over the risk-free curve. Nodes carry `source` and `is_estimated`.
+
+Decomposition, which must reconcile:
+
+```
+desk_spread     = external_rate_pct − ftp_rate_pct
+treasury_spread = ftp_rate_pct − actual_cost_of_funds_pct
+```
+
+`tests/test_ftp_reconciliation.py` asserts `desk_spread + treasury_spread = NIM`
+book-wide to within ₹1, and that FTP charges across all desks including `TREASURY`
+sum to zero. Both are in CI.
+
+**Implementation**: `src/slbdesk/analytics/ftp.py`, `db/queries/ftp_desk_pnl.sql`.
+
+---
+
+## 10. Book-level KPIs
+
+The dashboard's top strip. `db/queries/book_kpis.sql`, one row per `as_of_date`.
+
+| KPI | Definition |
+| --- | --- |
+| `total_on_loan_value` | `Σ q × P` over live `LEND` positions |
+| `total_borrowed_value` | `Σ q × P` over live `BORROW` positions |
+| `net_financing_spread_bps` | `Σ net_spread × 365 / Σ notional × 10000` |
+| `weighted_avg_fee_pct` | Notional-weighted `fee_annualised_pct` |
+| `book_utilisation_pct` | Notional-weighted utilisation |
+| `open_margin_calls` | `COUNT(*)` where `status = 'OPEN'` |
+| `book_dv01` | `Σ` signed DV01 over repo collateral |
+| `special_count` | Positions scoring ≥ 75 |
+
+---
+
+## 11. Validation queries
+
+Not optional. `make analytics` runs these and fails loudly.
+
+| Check | File |
+| --- | --- |
+| Rollover chains respect the 12-month tenure cap | `db/queries/validate_tenure.sql` |
+| `slb_trade_leg` ranges do not overlap within a trade | `db/queries/validate_legs.sql` |
+| FTP charges net to zero across desks | `db/queries/validate_ftp_zero.sql` |
+| No position priced off a quote older than 3 trading days without `is_stale` | `db/queries/validate_staleness.sql` |
+| Every market table has rows for the latest ingested date | `db/queries/validate_coverage.sql` |

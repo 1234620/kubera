@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.env
+.DS_Store
+
+# Landed market data: reproducible from NSE, too big to version.
+data/raw/
+data/processed/
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Power BI: the .pbit template is committed, a .pbix with data is not.
+*.pbix

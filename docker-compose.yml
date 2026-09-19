@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-slbdesk}
+      POSTGRES_USER: ${POSTGRES_USER:-slbdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-slbdesk}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-slbdesk}"]
+      interval: 5s
+      retries: 10
+    # Port deliberately not published: nothing outside the compose network needs it.
+
+  api:
+    build: .
+    command: uvicorn slbdesk.api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-slbdesk}
+      POSTGRES_USER: ${POSTGRES_USER:-slbdesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-slbdesk}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
