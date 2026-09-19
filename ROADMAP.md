@@ -23,8 +23,9 @@ doc section is written, CI is green.
 - `nse.py`: one session, browser headers, cookie warm-up, retry, date→URL builder
 - Parsers: SLB bhavcopy (fixed-width-ish CSV), open positions, eligible securities,
   foreclosure report, WDM security master, WDM daily trades
-- Backfill N trading days; skip holidays by 404 rather than a hardcoded calendar
-- Check: parse each fixture, assert row counts and one known value
+- Backfill N trading days; detect holidays by 404 *and* by the stale-file trap
+  (NSE serves the previous day's cash bhavcopy under a holiday's filename)
+- Check: parse each fixture, assert row counts and known values
 
 ### Stage 2 — Schema
 - Reference: `security`, `slb_series`, `gsec`

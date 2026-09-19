@@ -108,18 +108,80 @@ short code followed by the long text (`BONUS 1:1    BONUS 1:1`) — split on run
 two or more spaces and keep both. Small file, a handful of rows, and every row is a
 forced unwind: a P&L event, not reference data.
 
+The file **ends with a legend block** of short rows, which the parser must skip on
+field count:
+
+```
+SERIES**
+OLD,Series-01-12
+NEW,Series-X1-XD
+ALL,Both "OLD" and "NEW"
+```
+
+That legend is NSE confirming the contract-set split from
+[`01-domain-slb-lifecycle.md`](01-domain-slb-lifecycle.md) §3 — `OLD` is the
+force-foreclosing regular set, `NEW` is the non-foreclosing `X` set.
+
 ### 2.5 `C_VAR1_SLB_*.DAT` — VaR begin-day file
 
-Pipe-free CSV, ~5 MB, **no header**, with record-type-prefixed rows:
+CSV, ~5 MB, **no header**, with record-type-prefixed rows:
 
-- `10` — header record: `10,DDMMYYYY,0.0000,<record count>`
-- `20` — per-security: `20,<symbol>,<serial>,<ISIN>,<var_margin_pct>,<field6>,<applicable_var_pct>,<elm_pct>,<field9>,<total_margin_pct>`
+- `10` — header: `10,DDMMYYYY,0.0000,<record count>`
+- `20` — per security × series:
+  `20,<symbol>,<series_code>,<ISIN>,<var_pct>,<unused>,<applicable_var_pct>,<elm_pct>,<additional_margin_pct>,<total_margin_pct>`
 
-Example: `20,360ONE,01,INE466L01038,12.80,0.00,12.80,3.50,0.00,16.30` — 12.80% VaR
-margin, 3.50% extreme loss margin, 16.30% total. The total is our equity haircut.
-Field 6 and field 9 are 0.00 across the sample and are parsed but unused; the
-parser asserts `field5 + field8 ≈ field10` and logs a warning if it breaks, which
-is how we would notice NSE changing the layout.
+Example: `20,360ONE,01,INE466L01038,12.80,0.00,12.80,3.50,0.00,16.30`.
+
+Three things here were **wrong in the first draft of this document** and were
+corrected against the real file:
+
+1. **Column 3 is the series code, not a serial number.** The file carries 84,389
+   record-20 rows for 1,176 symbols — every symbol repeated across **73 series**.
+2. **The total is `applicable_var + elm + additional`**, and that identity holds
+   *exactly* for all 84,389 rows. The parser raises on violation, which is how a
+   layout change gets caught. Column 6 is 0.00 in every row; column 9 is non-zero
+   in 3,606 rows and is an additional/ad-hoc margin.
+3. **`applicable_var` is not the computed VaR.** It is floored at a regulatory
+   minimum, so it can exceed column 5 — ABBOTINDIA computes 8.21% but applies
+   9.00%. The applicable figure is the one that matters for a haircut.
+
+Total margin is **identical across all 73 series** for a given symbol (verified
+across every symbol in the file), so the parser de-duplicates to **one row per
+symbol** — 1,176 rows instead of 84,389.
+
+**Bonus: this file is the complete series master.** The bhavcopy only shows series
+that traded (11 on a sample day) and the eligibility file only those currently live
+(29), but the VaR file lists all 73: 12 regular, 12 non-foreclosing, 48 rollover and
+`R3`. That is exactly the count NCL's FAQ implies — twelve monthly series in each of
+two contract sets plus "forty-eight contracts for rollover" — so it independently
+confirms the taxonomy. `parse_slb_series_universe` extracts it as a by-product.
+
+### 2.6 `sec_bhavdata_full_*.csv` — cash market close and volume
+
+Path: `products/content/`. Discovered via `GET /api/daily-reports?key=CM` as
+"Full Bhavcopy and Security Deliverable data".
+
+Header: `SYMBOL, SERIES, DATE1, PREV_CLOSE, OPEN_PRICE, HIGH_PRICE, LOW_PRICE,
+LAST_PRICE, CLOSE_PRICE, AVG_PRICE, TTL_TRD_QNTY, TURNOVER_LACS, NO_OF_TRADES,
+DELIV_QTY, DELIV_PER` — note the values carry a leading space after each comma.
+
+**This file is not optional.** None of the SLB files contain an underlying share
+price, and without one a lending fee cannot be annualised
+([`07-analytics-spec.md`](07-analytics-spec.md) §1). It also supplies the traded
+volume that days-to-cover needs, so one file covers both gaps.
+
+Two traps, both found by testing rather than reading:
+
+- **Do not filter to `SERIES = 'EQ'`.** A security under surveillance trades in the
+  `BE` segment while remaining SLB-eligible. On the sample date **HFCL** is exactly
+  that: present in the SLB bhavcopy, absent from the EQ rows. An EQ-only filter
+  silently loses the price for the names most likely to be special. `series` is kept
+  as part of the natural key so a lookup can prefer `EQ` and fall back.
+- **`DELIV_QTY` and `DELIV_PER` are `-`, not empty**, in the `BE` segment. They must
+  parse to `NULL`, not 0 — a 0% delivery ratio is a meaningful and wrong number.
+
+`TURNOVER_LACS` is in **lakhs** (1 lakh = 100,000) and is converted to rupees on
+load, for the same reason the debt file's crore column is.
 
 ## 3. WDM (debt) files — the bond leg
 
@@ -201,9 +263,19 @@ is a real column on the tables that need it.
   the original bytes.
 - **Idempotent**: re-running a date overwrites the landing file and upserts on the
   natural key. Running the whole backfill twice changes nothing.
-- **Holidays**: the manifest omits non-trading days, and a direct archive fetch for
-  one returns 404. Both are treated as "no data", not as an error. No hardcoded
-  holiday calendar.
+- **Holidays**: mostly a 404, which is treated as "no data" rather than an error —
+  no hardcoded holiday calendar. **But not always.** On an exchange holiday NSE
+  does *not* 404 the cash bhavcopy: it serves a **stale copy under the holiday's
+  filename**. `sec_bhavdata_full_14092026.csv` returns 200 with **11-Sep-2026**
+  rows in it. The begin-day VaR file behaves similarly, because it is published
+  ahead for future settlement days.
+
+  A backfill that trusted the filename would load one day's prices under several
+  dates and quietly corrupt every fee annualisation and every mark. So the
+  ingester **trusts the date inside the file, never the date in its name**: it
+  checks the cash bhavcopy's own `DATE1` against the requested date and skips the
+  whole date if they disagree. `is_trading_day()` in
+  `src/slbdesk/ingest/__main__.py`, checked in `tests/test_parsers.py`.
 - **Politeness**: one client, sequential requests, 250 ms gap, three retries with
   exponential backoff on 5xx and on the Akamai 403 (which is usually a cookie
   expiry and is fixed by re-warming).

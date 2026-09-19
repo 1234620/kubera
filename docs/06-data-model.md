@@ -62,8 +62,18 @@ Four rows. See [`04-domain-ftp.md`](04-domain-ftp.md) §6.
 | `slb_open_position` | `slb_openpos_*.csv` | day × symbol × series | `(trade_date, symbol, series_code)` |
 | `slb_eligibility` | `SLB_ELG_SEC_*.csv` | day × symbol × series | `(as_of_date, symbol, series_code)` |
 | `slb_foreclosure` | `Forclosure_SLB_*.CSV` | event | `(symbol, record_date, action_desc)` |
-| `slb_var_margin` | `C_VAR1_SLB_*.DAT` | day × ISIN | `(as_of_date, isin)` |
+| `slb_var_margin` | `C_VAR1_SLB_*.DAT` | day × symbol | `(as_of_date, symbol)` |
+| `cash_quote_daily` | `sec_bhavdata_full_*.csv` | day × symbol × series | `(trade_date, symbol, series)` |
 | `gsec_trade_daily` | `trd*_sett.csv` | day × security × settl days | `(trade_date, security_code, settl_days)` |
+
+`slb_var_margin` is keyed on symbol, not ISIN: the source file repeats every symbol
+across all 73 series with identical margins, so it de-duplicates on load. `slb_series`
+is populated from the same file, which is the only one listing the full series
+universe.
+
+`cash_quote_daily` keeps `series` in the key because a surveillance-segment (`BE`)
+security can be SLB-eligible while absent from `EQ`; see
+[`05-data-sources.md`](05-data-sources.md) §2.6.
 
 `slb_quote_daily` columns: `prev_close_fee`, `open_fee`, `high_fee`, `low_fee`,
 `close_fee`, `year_high_fee`, `year_low_fee`, `traded_qty`, `traded_value_inr`,

@@ -71,8 +71,10 @@ it needs a real secret and this file is not where it goes.
   changes a layout, the original file is still there.
 - Holidays: the manifest omits them and a direct fetch 404s. Both mean "no data",
   not an error. No holiday calendar to maintain.
-- Re-running a date is safe: the landing file is overwritten and the load upserts
-  on the natural key.
+- Re-running a date is safe and cheap: an already-landed file is reused rather than
+  re-fetched, and the load upserts on the natural key. `--force` re-downloads.
+- The G-Sec security master is fetched once per run for the newest date, not per
+  day — it is a security master, not a time series.
 - A 403 is almost always an expired Akamai cookie. The client re-warms and retries
   three times with exponential backoff before giving up on that file, and it
   reports which file failed rather than dying on the whole batch.
@@ -112,7 +114,8 @@ passes, and CI failing always means *our* code broke.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `403` from nseindia.com | Cookie not warmed, or missing referer | The client handles it; if it persists NSE has changed its edge rules — check `nse.py` headers |
-| `404` on an archive file | Non-trading day, or the file is not published yet for today | Expected. Check `GET /api/data-coverage` |
+| `404` on an archive file | Non-trading day, or not published yet for today | Expected. Check `GET /api/data-coverage` |
+| `skipped - exchange holiday` | NSE served a stale cash bhavcopy under that date's filename | Expected and correct; the date is genuinely not a trading day |
 | Empty specialness table | Fewer than 21 days of history, so the trailing baseline is null | `DAYS=60 make ingest` |
 | Dashboard shows `—` for utilisation | `lendable_qty` estimate missing for that symbol | Expected for newly eligible names; the cell is labelled as an estimate |
 | FTP reconciliation test fails | A position has no curve point at its tenor | Check `GET /api/ftp/curve` for a gap; the interpolator should not have one |

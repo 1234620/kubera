@@ -56,6 +56,12 @@ position to November" is its own tradable contract. Only near-month rollovers ar
 live at any time, and their last trading day is the fourth working day before the
 source series expires.
 
+Counting them up: 12 + 12 + 48 rollover = 72, plus a short-dated `R3` series =
+**73**, which is exactly the series count in the begin-day VaR file. That file is
+therefore the only complete series master, and it confirms this taxonomy
+independently of the circulars. The foreclosure report's own legend agrees:
+`OLD` = series 01–12, `NEW` = series X1–XD, `ALL` = both.
+
 **Consequence for the data model:** the series code alone does not give you a
 tenor. You must join to the observed reverse-leg settlement date, which the
 bhavcopy publishes per row. `slb_series` is therefore populated *from the data*,
