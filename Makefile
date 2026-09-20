@@ -40,6 +40,9 @@ test: ## Run the full suite (in the container, so the database tests run too)
 test-local: ## Run pytest on the host (database tests skip)
 	pytest -q
 
+readme-svgs: ## Regenerate the animated README images
+	python scripts/build_readme_svgs.py
+
 test-ci: ## Reproduce CI: a throwaway database with only the committed fixtures
 	$(COMPOSE) exec -T db dropdb -U $${POSTGRES_USER:-slbdesk} --if-exists citest
 	$(COMPOSE) exec -T db createdb -U $${POSTGRES_USER:-slbdesk} citest

@@ -1,4 +1,41 @@
-# Securities Lending & Repo Financing Desk Analytics
+<div align="center">
+
+<img src="docs/assets/hero.svg" alt="Kubera — securities financing desk analytics" width="100%">
+
+# Kubera
+
+**A securities lending & repo financing desk, built on real Indian market data.**
+
+Named for the Hindu god of wealth and treasurer of the gods — and a nod to
+[E-Kuber](https://www.rbi.org.in/), the RBI's own auction and settlement platform.
+
+[![CI](https://github.com/1234620/kubera/actions/workflows/ci.yml/badge.svg)](https://github.com/1234620/kubera/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-287%20passing-white?labelColor=07070a)](tests)
+[![Checked against NSE](https://img.shields.io/badge/yields%20vs%20NSE-132%2F133%20within%202bp-white?labelColor=07070a)](docs/03-domain-bond-math.md#11-validation-plan)
+[![Median error](https://img.shields.io/badge/median%20yield%20error-0.000%20bp-white?labelColor=07070a)](docs/03-domain-bond-math.md#11-validation-plan)
+
+[![Python](https://img.shields.io/badge/python-3.12-white?labelColor=07070a)](pyproject.toml)
+[![Postgres](https://img.shields.io/badge/postgres-16-white?labelColor=07070a)](db/migrations)
+[![FastAPI](https://img.shields.io/badge/fastapi-read--only-white?labelColor=07070a)](docs/08-api-spec.md)
+[![Dependencies](https://img.shields.io/badge/dependencies-5-white?labelColor=07070a)](pyproject.toml)
+[![No build step](https://img.shields.io/badge/frontend-no%20build%20step-white?labelColor=07070a)](docs/adr/0003-no-frontend-framework.md)
+[![Licence](https://img.shields.io/badge/licence-MIT-white?labelColor=07070a)](LICENSE)
+
+</div>
+
+---
+
+<div align="center">
+
+<img src="docs/assets/dashboard.svg" alt="The desk: KPI strip, specialness heatmap, desk and treasury attribution, blotter" width="100%">
+
+<sub>Both images above are animated SVGs, hand-built from the project's own data —
+the globe's coastlines are the same Natural Earth set the live page renders, and
+every figure shown is a real output.</sub>
+
+</div>
+
+---
 
 A working stock-borrow-loan (SBL) and repo financing book built on **real, public
 Indian market data** — NSE Clearing's Securities Lending & Borrowing (SLB) daily
@@ -11,7 +48,9 @@ internal funding cost across desks through a Funds Transfer Pricing model.
 
 ```
 NSE archives ──▶ ingest ──▶ Postgres ──▶ SQL analytics ──▶ FastAPI ──▶ dashboard
-  (SLB + WDM)    (parsers)   (star-ish)   (CTEs, windows)            └▶ Power BI
+  (SLB + WDM)    (parsers)   (32 tables)  (CTEs, windows)            └▶ Power BI
+                                  │
+                                  └──▶ curves (bootstrap · NSS · forwards)
 ```
 
 ## Why this project exists

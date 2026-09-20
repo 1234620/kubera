@@ -18,7 +18,7 @@ SOURCES = sorted(WEB.rglob("*.html")) + sorted(WEB.rglob("*.css")) + sorted(WEB.
 
 def test_the_dashboard_exists():
     assert INDEX.is_file()
-    assert "SLB &amp; Repo Financing Desk" in INDEX.read_text()
+    assert "Kubera" in INDEX.read_text()
 
 
 def test_there_is_no_build_step():
@@ -217,19 +217,31 @@ def test_every_nav_anchor_resolves():
     assert anchors <= targets, anchors - targets
 
 
-def test_the_hero_grid_track_is_constrained():
-    """`minmax(0, 1fr)`, never an implicit `auto` track.
+def test_the_hero_cannot_blow_out_its_container():
+    """The hero's child must be width-constrained, whichever layout it uses.
 
-    An auto grid track sizes to MAX-CONTENT. The hero's stats grid wants four
-    118px columns, so the track resolved to 598px inside a 375px viewport and
-    overflow:hidden clipped the headline -- with no scrollbar and no console
-    error to give it away. scrollWidth even reported no overflow. This is the
-    canonical CSS grid blow-out and it is worth pinning down.
+    This bit once and was nearly invisible. Both grid and flex size a track or
+    item to its CONTENT by default, and the hero's stats grid wants four 118px
+    columns -- which resolved to 598px inside a 375px viewport. `overflow:
+    hidden` then clipped the headline with no scrollbar, no console error, and
+    `scrollWidth` reporting no overflow at all.
+
+    The guard differs by layout, so both forms are accepted:
+      grid -> grid-template-columns: minmax(0, 1fr)
+      flex -> min-width: 0 on the child
     """
     css = (WEB / "css" / "app.css").read_text()
+
     hero = css[css.index(".hero {") :]
     hero = hero[: hero.index("}")]
-    assert "grid-template-columns: minmax(0, 1fr)" in hero
+    hero_copy = css[css.index(".hero-copy {") :]
+    hero_copy = hero_copy[: hero_copy.index("}")]
+
+    grid_guard = "grid-template-columns: minmax(0, 1fr)" in hero
+    flex_guard = "flex-direction: column" in hero and "min-width: 0" in hero_copy
+    assert grid_guard or flex_guard, "hero has no width guard"
+
+    assert "width: 100%" in hero_copy
 
 
 def test_numbers_are_tabular():

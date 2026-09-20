@@ -153,65 +153,60 @@ body::after {
 
 /* --- hero ----------------------------------------------------------------- */
 
+/* Globe on top, copy beneath it — a vertical stack rather than the reference's
+   type-over-globe. The sphere is in normal flow so it cannot be clipped by the
+   hero's bounds, and the copy pulls up under its lower third so the two read as
+   one composition instead of two stacked blocks. */
 .hero {
   position: relative;
-  display: grid;
-  /* minmax(0, 1fr), not the implicit `auto`. An auto track sizes to MAX-CONTENT,
-     and the stats grid wants four 118px columns, so the track resolved to 598px
-     inside a 375px hero and the copy was clipped by overflow:hidden -- silently,
-     with no scrollbar to give it away. This is the canonical grid blow-out. */
-  grid-template-columns: minmax(0, 1fr);
-  place-items: center;
-  min-height: min(94vh, 880px);
-  padding: 64px var(--gutter) 88px;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px var(--gutter) 88px;
   text-align: center;
+  overflow: hidden;
 }
 
-/* Sized and placed so the globe reads as a horizon BEHIND the copy rather than
-   a backdrop the type sits on top of. Anchored below centre, as in the
-   reference, so its upper arc passes behind the buttons and the rest is cropped
-   by the product frame below. */
 .globe {
-  position: absolute;
-  top: 74%;
-  left: 50%;
-  width: min(68vw, 540px);
+  position: relative;
+  flex: none;
+  width: min(80vw, 400px);
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
   z-index: 0;
   cursor: grab;
   touch-action: none;
   outline: none;
 }
 
-@media (min-width: 1100px) {
-  .globe { width: 620px; top: 76%; }
+@media (min-width: 900px) {
+  .globe { width: 470px; }
 }
 
 .globe.grabbing { cursor: grabbing; }
 .globe:focus-visible { outline: 1px solid var(--accent); outline-offset: 10px; }
 
-/* The copy sits above the globe, with the page colour feathered behind it so the
-   coastlines never fight the type. */
+/* Tucks up under the sphere. The feather stays: the copy still crosses the
+   globe's lower arc, and coastlines behind type make both harder to read. */
 .hero-copy {
   position: relative;
   z-index: 1;
   width: 100%;
+  min-width: 0;
   max-width: 940px;
+  margin-top: clamp(-96px, -9vw, -44px);
   padding: 0 4px;
 }
 
 .hero-copy::before {
   content: "";
   position: absolute;
-  inset: -34% -22%;
+  inset: -26% -22% -12%;
   z-index: -1;
-  background: radial-gradient(58% 48% at 50% 38%,
+  background: radial-gradient(64% 52% at 50% 30%,
     var(--bg) 0%,
-    var(--bg) 34%,
-    color-mix(in oklab, var(--bg) 72%, transparent) 62%,
-    transparent 86%);
+    var(--bg) 40%,
+    color-mix(in oklab, var(--bg) 74%, transparent) 66%,
+    transparent 88%);
 }
 
 .eyebrow {
@@ -289,11 +284,7 @@ body::after {
 }
 
 .scroll-cue {
-  position: absolute;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  margin: 0;
+  margin: 34px 0 0;
   z-index: 1;
   font-size: .66rem;
   letter-spacing: .14em;
