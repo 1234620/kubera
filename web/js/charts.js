@@ -33,7 +33,9 @@ const BASE_SCALES = () => ({
 export function termStructureChart(canvas, series) {
   // The accent first, then muted tones. Restraint: the first series is the one
   // being asked about, and the rest are context.
-  const palette = [token("--accent"), token("--pos"), token("--warn"), token("--text-faint")];
+  // White first -- the series being asked about -- then muted tones for context.
+  // In monochrome the ordering IS the hierarchy.
+  const palette = [token("--accent"), token("--text-dim"), token("--warn"), token("--text-faint")];
 
   return new Chart(canvas, {
     type: "line",

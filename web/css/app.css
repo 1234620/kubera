@@ -1,21 +1,22 @@
 /* Layout, surfaces and motion. Palette and its references: tokens.css.
    Design notes: docs/09-frontend.md. Rules: rules/FRONTEND.md.
 
-   Structure follows the invariants the 2026 dashboard references share -- a
-   fixed sidebar, four to six KPI cards, a 12-column content grid, skeleton
-   loading and both themes shipped from day one. Restraint is the point: the
-   accent appears on about one element per region, and gradients do work
-   (surface depth, data fills) rather than decoration. */
+   Two parts: a landing hero with a rotatable globe, then the product framed as a
+   window below it — the structure the Awwwards reference in the brief uses.
+   Restraint is the point: the accent is pure white, so it appears as an inverted
+   fill or a hairline ring and never as a wash. */
 
 *,
 *::before,
 *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
 
 body {
   margin: 0;
-  min-height: 100vh;
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
@@ -24,20 +25,304 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* One quiet gradient on the whole page, anchored where the eye starts. The
-   first version had three coloured blobs drifting behind everything; this is a
-   single warm lift so the surfaces above it read as raised. */
-body::before {
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+/* The faint grain the reference has over everything. An SVG turbulence filter
+   rather than an image, so it costs no request and scales to any viewport. */
+body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 9;
   pointer-events: none;
-  background:
-    radial-gradient(70vw 50vh at 0% 0%,
-      color-mix(in oklab, var(--accent) 7%, transparent), transparent 62%),
-    radial-gradient(60vw 50vh at 100% 0%,
-      color-mix(in oklab, var(--pos) 4%, transparent), transparent 60%);
+  opacity: .028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --- top nav -------------------------------------------------------------- */
+
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 26px;
+  backdrop-filter: blur(14px);
+  background: color-mix(in oklab, var(--bg) 72%, transparent);
+  border-bottom: 1px solid transparent;
+  transition: border-color .25s var(--ease);
+}
+
+.topnav:hover { border-bottom-color: var(--border); }
+
+.wordmark {
+  font-family: var(--mono);
+  font-size: .82rem;
+  font-weight: 600;
+  letter-spacing: .34em;
+  color: var(--text-bright);
+  text-decoration: none;
+}
+
+/* Centred, as in the reference. */
+.topnav-links {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+}
+
+.topnav-links a {
+  position: relative;
+  font-size: .8rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color .16s var(--ease);
+}
+
+.topnav-links a:hover { color: var(--text-bright); }
+
+/* The underline is the accent doing its job as a hairline rather than a fill. */
+.topnav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform .2s var(--ease);
+}
+
+.topnav-links a:hover::after { transform: scaleX(1); }
+
+.topnav > .btn-primary { justify-self: end; }
+
+@media (max-width: 860px) {
+  .topnav {
+    grid-template-columns: 1fr auto;
+    padding: 14px var(--gutter);
+  }
+  .topnav-links { display: none; }
+}
+
+/* --- buttons -------------------------------------------------------------- */
+
+/* Inversion: a white fill with black type is the loudest thing available on a
+   black page, which is how emphasis works without a hue. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: .8rem;
+  font-weight: 560;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: transform .16s var(--ease), opacity .16s var(--ease);
+}
+
+.btn-primary:hover { transform: translateY(-1px); opacity: .88; }
+.btn-primary.lg { padding: 12px 22px; font-size: .88rem; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: .8rem;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color .16s var(--ease), color .16s var(--ease);
+}
+
+.btn-ghost:hover { border-color: var(--accent); color: var(--text-bright); }
+.btn-ghost.lg { padding: 12px 22px; font-size: .88rem; }
+
+/* --- hero ----------------------------------------------------------------- */
+
+.hero {
+  position: relative;
+  display: grid;
+  /* minmax(0, 1fr), not the implicit `auto`. An auto track sizes to MAX-CONTENT,
+     and the stats grid wants four 118px columns, so the track resolved to 598px
+     inside a 375px hero and the copy was clipped by overflow:hidden -- silently,
+     with no scrollbar to give it away. This is the canonical grid blow-out. */
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  min-height: min(94vh, 880px);
+  padding: 64px var(--gutter) 88px;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* Sized and placed so the globe reads as a horizon BEHIND the copy rather than
+   a backdrop the type sits on top of. Anchored below centre, as in the
+   reference, so its upper arc passes behind the buttons and the rest is cropped
+   by the product frame below. */
+.globe {
+  position: absolute;
+  top: 74%;
+  left: 50%;
+  width: min(68vw, 540px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+}
+
+@media (min-width: 1100px) {
+  .globe { width: 620px; top: 76%; }
+}
+
+.globe.grabbing { cursor: grabbing; }
+.globe:focus-visible { outline: 1px solid var(--accent); outline-offset: 10px; }
+
+/* The copy sits above the globe, with the page colour feathered behind it so the
+   coastlines never fight the type. */
+.hero-copy {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 940px;
+  padding: 0 4px;
+}
+
+.hero-copy::before {
+  content: "";
+  position: absolute;
+  inset: -34% -22%;
+  z-index: -1;
+  background: radial-gradient(58% 48% at 50% 38%,
+    var(--bg) 0%,
+    var(--bg) 34%,
+    color-mix(in oklab, var(--bg) 72%, transparent) 62%,
+    transparent 86%);
+}
+
+.eyebrow {
+  margin: 0 0 16px;
+  font-family: var(--mono);
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(1.85rem, 6.2vw, 4.1rem);
+  line-height: 1.04;
+  font-weight: 680;
+  letter-spacing: -.035em;
+  /* The base line is the middle of the ramp so the emphasised phrase can be
+     brighter than it. Colour cannot do this job here; luminance can. */
+  color: var(--text-dim);
+  text-wrap: balance;
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--text-bright);
+}
+
+.lede {
+  margin: 20px auto 0;
+  max-width: 620px;
+  font-size: clamp(.9rem, 1.5vw, 1.02rem);
+  color: var(--text-dim);
+  text-wrap: pretty;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 12px 24px;
+  margin: 40px auto 0;
+  max-width: 680px;
+  padding: 18px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--bg) 62%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.hero-stats div { text-align: center; }
+
+.hero-stats dt {
+  font-size: .64rem;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.hero-stats dd {
+  margin: 5px 0 0;
+  font-family: var(--mono);
+  font-size: 1.04rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-bright);
+}
+
+.scroll-cue {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 1;
+  font-size: .66rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  animation: breathe 3.4s var(--ease) infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+
+/* --- the product, framed as a window -------------------------------------- */
+
+.desk-frame {
+  position: relative;
+  z-index: 2;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 70px;
+}
+
+.desk-frame .app {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-deep);
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 /* --- shell ---------------------------------------------------------------- */
@@ -45,19 +330,18 @@ body::before {
 .app {
   display: grid;
   grid-template-columns: var(--sidebar) minmax(0, 1fr);
-  min-height: 100vh;
 }
 
 /* A fixed rail: the reference dashboards all use one, and it turns a long
    scroll into something you can navigate. */
 .rail {
   position: sticky;
-  top: 0;
+  top: 57px;              /* clears the sticky top nav */
   align-self: start;
-  height: 100vh;
+  height: calc(100vh - 57px);
   padding: 22px 16px;
   border-right: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--surface), var(--bg) 70%);
+  background: linear-gradient(180deg, var(--surface), var(--bg-deep) 70%);
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -156,7 +440,7 @@ body::before {
   margin-bottom: 20px;
 }
 
-.pagehead h1 {
+.pagehead h2 {
   margin: 0;
   font-size: 1.12rem;
   font-weight: 620;
@@ -320,7 +604,7 @@ body::before {
   border-bottom: 1px solid var(--border);
 }
 
-.panel > header h2 {
+.panel > header h3 {
   margin: 0;
   font-size: .76rem;
   font-weight: 620;
@@ -389,7 +673,7 @@ input[type="search"]:focus-visible,
   border-radius: 4px;
   display: grid;
   place-items: center;
-  color: var(--on-heat);
+  color: var(--on-heat-dark);
   font-weight: 620;
   animation: fade .45s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 6ms);
@@ -400,7 +684,7 @@ input[type="search"]:focus-visible,
 .heat .cell:hover { transform: scale(1.07); outline-color: var(--text); z-index: 2; }
 
 /* Dark end of the ramp needs light ink; one colour cannot serve both ends. */
-.heat .cell.low { color: var(--text); }
+.heat .cell.low { color: var(--on-heat-light); }
 
 .heat .cell.empty {
   background: color-mix(in oklab, var(--border) 40%, transparent);
@@ -514,7 +798,7 @@ tbody tr.called { animation: rowin .38s var(--ease) both, called 2.2s var(--ease
 .pill.gc   { background: color-mix(in oklab, var(--spec-0) 60%, transparent); color: var(--text-dim); }
 .pill.warm { background: color-mix(in oklab, var(--spec-1) 45%, transparent); color: var(--text); }
 .pill.spec { background: color-mix(in oklab, var(--spec-3) 30%, transparent); color: var(--spec-3); }
-.pill.htb  { background: var(--spec-4); color: var(--on-heat); }
+.pill.htb  { background: var(--spec-4); color: var(--on-heat-dark); }
 
 /* --- loading and errors --------------------------------------------------- */
 

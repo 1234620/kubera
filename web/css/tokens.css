@@ -1,80 +1,93 @@
-/* Design tokens. Every colour in the dashboard is defined here and nowhere else
+/* Design tokens. Every colour in the interface is defined here and nowhere else
    (rules/FRONTEND.md). Dark-first, because this is a trading screen.
 
-   REFERENCE: the Robinhood identity by PORTO ROCHA (2024), which won its
-   category for doing the opposite of what fintech usually does. Its colour
-   strategy "departs from competitors' rainbow approach, opting instead for a
-   focused palette of black, white and mature neutrals that make room for pops
-   of Robin Neon". Robin Neon is #CCFF00; the neutrals are warm, not blue.
+   REFERENCE: the "Algorithmic Trading Dashboard" concept on Awwwards, which the
+   brief supplied as the target look — near-black surfaces with a faint grain, a
+   centred nav, an oversized hero with one emphasised word, a rotating globe
+   behind it, and the product framed as a floating window below.
 
-   The first version of this dashboard was exactly the rainbow that rebrand
-   rejected -- a blue/purple/cyan mesh gradient behind every card. Loud, generic,
-   and it made six KPI cards compete with each other instead of ranking. This
-   palette is one accent on warm near-black, and the gradients now do work
-   (surface depth, data fills) rather than decoration.
+   That reference uses black + electric blue. The brief asked for BLACK + WHITE,
+   which changes the whole mechanism of emphasis and is the interesting part.
+   With a coloured accent you make something important by making it blue. In
+   monochrome you cannot, so emphasis has to come from:
 
-   Secondary references for the dark-first structure: Linear (cool restraint,
-   near-black surfaces, one brand accent), Stripe (dense data tables), Vercel
-   (near-monochrome plus context colour). Their shared lesson is restraint, so
-   the accent appears on roughly one element per screen region, never on all. */
+     * LUMINANCE   pure white against off-white against grey, in steps
+     * INVERSION   the primary button is a white fill with black text, which is
+                   the loudest thing available on a black page
+     * WEIGHT      heavier type and tighter tracking on what matters
+     * SPACE       the hero gets room; everything else is dense
+
+   Three text greys and one pure white do the work a hue would otherwise do, so
+   the ramp below is deliberately even in steps rather than picked by eye. */
 
 :root {
   color-scheme: dark;
 
-  /* Surfaces. Warm near-black, after Porto Rocha's #1C180D -- a blue-black
-     makes financial green/red read as neon; a warm black lets them sit. */
-  --bg:             #0b0a07;
-  --bg-deep:        #070604;
-  --surface:        #131109;
-  --surface-raised: #1a1710;
-  --surface-hover:  #221e15;
+  /* Surfaces. Near-black with the faintest blue-grey cast rather than pure
+     #000: an absolute black makes the panel edges vanish and the grain look
+     like dead pixels. */
+  --bg:             #07070a;
+  --bg-deep:        #040406;
+  --surface:        #0d0d11;
+  --surface-raised: #131318;
+  --surface-hover:  #1b1b22;
 
-  /* Hairlines at low alpha, which is how Linear and Stripe separate dense rows
-     without drawing a grid. */
-  --border:         #2a2619;
-  --border-bright:  #3d3826;
+  /* Hairlines at low alpha, which is how the reference separates dense rows
+     without drawing a visible grid. */
+  --border:         #1e1e25;
+  --border-bright:  #32323d;
 
-  /* Warm neutral text ramp, from the rebrand's #D4D0C9 / #B4B1AB / #8A8783. */
-  --text:           #eae7dd;
-  --text-dim:       #b4b1ab;
-  --text-faint:     #8a8783;
+  /* The luminance ramp that replaces a hue. Each step is a clear jump so
+     hierarchy survives on a dim laptop screen. */
+  --text-bright:    #ffffff;
+  --text:           #e7e7ec;
+  --text-dim:       #9a9aa6;
+  --text-faint:     #63636f;
 
-  /* ONE accent. Robin Neon. Used for the primary metric, focus rings and the
-     single most important series on a chart -- nothing else. */
-  --accent:         #ccff00;
-  --accent-soft:    #a8d100;
-  --accent-ink:     #171a00;   /* text laid on the accent */
+  /* THE accent is white. It appears as an inverted fill, a hairline ring, or
+     pure white type — never as a wash. */
+  --accent:         #ffffff;
+  --accent-ink:     #07070a;   /* type laid on the accent */
+  --accent-soft:    rgb(255 255 255 / 0.08);
 
-  /* Gain and loss. Adjusted for deuteranopia and kept muted so they never
-     compete with the accent; colour is never the only channel, sign and
-     position carry it too. */
-  --pos:            #5fd3a2;
-  --neg:            #ff8b73;
-  --warn:           #ffc861;
+  /* Direction on a number, kept deliberately desaturated so it reads as data
+     rather than as a second accent. Colour is never the only channel: sign and
+     position carry it too, and the arrows in the blotter are not decorative. */
+  --pos:            #6ee7a8;
+  --neg:            #ff8f7a;
+  --warn:           #f0c86a;
 
   /* Specialness ramp. Sequential in OKLCH so the gradient is perceptually even
-     -- a naive HSL ramp bunches up in the greens and misleads the eye. Runs
-     from the warm surface through the accent's hue family into a hot amber, so
-     it belongs to this palette rather than importing a second one. */
-  --spec-0: oklch(30% 0.022 95);
-  --spec-1: oklch(45% 0.070 105);
-  --spec-2: oklch(62% 0.130 110);
-  --spec-3: oklch(78% 0.185 105);
-  --spec-4: oklch(72% 0.185 55);
+     — a naive ramp bunches up and misleads the eye. Monochrome by design: it
+     runs dark-to-white so the hottest cell is the brightest thing in the panel,
+     which is exactly where the eye should land. */
+  --spec-0: oklch(26% 0.004 260);
+  --spec-1: oklch(42% 0.004 260);
+  --spec-2: oklch(58% 0.003 260);
+  --spec-3: oklch(76% 0.002 260);
+  --spec-4: oklch(97% 0.000 260);
 
-  /* Text laid on a heat cell. The ramp is light across most of its range, so
-     this stays dark in both themes rather than following --text. */
-  --on-heat: oklch(18% 0.02 95);
+  /* Type laid on a heat cell flips at the ramp's midpoint; one ink colour
+     cannot serve both ends of a light-to-dark scale. */
+  --on-heat-dark:  #06060a;
+  --on-heat-light: #e7e7ec;
+
+  /* The globe's sphere shading. Canvas cannot read a gradient from CSS, so the
+     three stops are declared here as plain colours and the canvas reads them --
+     keeping every palette decision in this file (rules/FRONTEND.md). */
+  --globe-core: rgb(255 255 255 / 0.10);
+  --globe-mid:  rgb(255 255 255 / 0.025);
+  --globe-edge: rgb(255 255 255 / 0);
 
   /* Geometry. Four radii, one easing, one shadow recipe. */
-  --radius:    12px;
-  --radius-sm: 8px;
-  --gutter:    16px;
-  --sidebar:   232px;
-  --ease:      cubic-bezier(.32, .72, 0, 1);
-  --shadow:    0 1px 2px rgb(0 0 0 / .4), 0 12px 32px -20px rgb(0 0 0 / .9);
+  --radius-lg:  18px;
+  --radius:     12px;
+  --radius-sm:  8px;
+  --gutter:     16px;
+  --sidebar:    216px;
+  --ease:       cubic-bezier(.32, .72, 0, 1);
+  --shadow:     0 1px 2px rgb(0 0 0 / .5), 0 16px 48px -24px rgb(0 0 0 / .9);
 
-  /* Inter and JetBrains Mono: both open-source, and Inter is what Linear uses. */
   --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -83,26 +96,43 @@
   :root:not([data-theme="dark"]) {
     color-scheme: light;
 
-    --bg:             #f7f5ef;
-    --bg-deep:        #eeebe2;
-    --surface:        #fffefb;
-    --surface-raised: #fffefb;
-    --surface-hover:  #f2efe6;
+    --bg:             #f6f6f8;
+    --bg-deep:        #ebebef;
+    --surface:        #ffffff;
+    --surface-raised: #ffffff;
+    --surface-hover:  #f0f0f4;
 
-    --border:         #ddd8ca;
-    --border-bright:  #c3bdaa;
+    --border:         #e0e0e6;
+    --border-bright:  #c2c2cc;
 
-    --text:           #1c180d;
-    --text-dim:       #5c584c;
-    --text-faint:     #8a8783;
+    /* The ramp inverts: "bright" is now the darkest ink. */
+    --text-bright:    #06060a;
+    --text:           #16161c;
+    --text-dim:       #5a5a66;
+    --text-faint:     #8a8a96;
 
-    /* The neon needs darkening on a light ground or it disappears. */
-    --accent:         #6f8c00;
-    --accent-soft:    #8caa00;
+    /* White cannot be the accent on a white page, so it inverts to near-black
+       and the primary button becomes a dark fill with light type. The mechanism
+       is unchanged: the accent is still the extreme end of the luminance ramp. */
+    --accent:         #06060a;
     --accent-ink:     #ffffff;
+    --accent-soft:    rgb(0 0 0 / 0.06);
 
-    --pos:            #12805f;
-    --neg:            #c04a2e;
-    --warn:           #9a6a00;
+    --pos:            #0f7a58;
+    --neg:            #c0442a;
+    --warn:           #8a6000;
+
+    --spec-0: oklch(93% 0.003 260);
+    --spec-1: oklch(78% 0.003 260);
+    --spec-2: oklch(60% 0.003 260);
+    --spec-3: oklch(42% 0.003 260);
+    --spec-4: oklch(20% 0.002 260);
+
+    --on-heat-dark:  #f6f6f8;
+    --on-heat-light: #16161c;
+
+    --globe-core: rgb(0 0 0 / 0.10);
+    --globe-mid:  rgb(0 0 0 / 0.03);
+    --globe-edge: rgb(0 0 0 / 0);
   }
 }

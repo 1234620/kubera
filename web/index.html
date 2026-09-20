@@ -13,140 +13,186 @@
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<div class="app">
 
-  <aside class="rail">
-    <div class="brand">
-      <span class="mark">Financing Desk</span>
-      <span class="tag">SLB · G-Sec repo · FTP</span>
+<!-- ============ Landing ============ -->
+<header class="topnav">
+  <a class="wordmark" href="#top">SLB&nbsp;DESK</a>
+
+  <nav class="topnav-links" aria-label="Sections">
+    <a href="#sec-book">Book</a>
+    <a href="#sec-specialness">Specialness</a>
+    <a href="#sec-curves">Curves</a>
+    <a href="#sec-attribution">Attribution</a>
+    <a href="#sec-blotter">Blotter</a>
+  </nav>
+
+  <a class="btn-primary" href="#desk">Open the desk</a>
+</header>
+
+<main id="top" class="hero">
+  <!-- The globe sits behind the type. aria-hidden because it carries no
+       information; the keyboard handler exists so it is still reachable. -->
+  <canvas id="globe" class="globe" tabindex="0"
+          aria-label="Rotatable globe. Drag, or use the arrow keys."></canvas>
+
+  <div class="hero-copy">
+    <p class="eyebrow">Real NSE Clearing data</p>
+    <h1>
+      Your gateway to <em>securities financing</em> analytics
+    </h1>
+    <p class="lede">
+      Stock borrow-loan, G-Sec repo and funds transfer pricing — priced from the
+      exchange&rsquo;s own published files, and checked against its own published numbers.
+    </p>
+
+    <div class="hero-actions">
+      <a class="btn-primary lg" href="#desk">Open the desk <span aria-hidden="true">→</span></a>
+      <a class="btn-ghost lg" href="/docs">API docs</a>
     </div>
 
-    <nav aria-label="Sections">
-      <a href="#sec-book">Book</a>
-      <a href="#sec-specialness">Specialness</a>
-      <a href="#sec-curves">Curves</a>
-      <a href="#sec-attribution">Attribution</a>
-      <a href="#sec-blotter">Blotter</a>
-    </nav>
+    <dl class="hero-stats">
+      <div><dt>Market rows ingested</dt><dd>1.08 M</dd></div>
+      <div><dt>Yields matching NSE</dt><dd>132 / 133</dd></div>
+      <div><dt>Median yield error</dt><dd>0.000 bp</dd></div>
+      <div><dt>Automated checks</dt><dd>281</dd></div>
+    </dl>
+  </div>
 
-    <div class="foot">
-      Market data: NSE &amp; NSE Clearing, education only. The book is synthetic.<br>
-      Fees are ₹/share for the contract period, annualised ACT/365.<br><br>
-      <a href="/docs">API docs</a> · <a href="/api/data-coverage">coverage</a>
-    </div>
-  </aside>
+  <p class="scroll-cue" aria-hidden="true">Drag the globe · scroll for the desk</p>
+</main>
 
-  <main class="main">
+<!-- ============ The product ============ -->
+<section id="desk" class="desk-frame">
+  <div class="app">
 
-    <div class="pagehead">
-      <h1 id="sec-book">Book overview</h1>
-      <span class="spacer"></span>
-      <span class="stamp">
-        <span class="dot" id="stamp-dot"></span>
-        <span id="stamp-text">end of day</span>
-        <strong id="stamp-date">…</strong>
-      </span>
-    </div>
+    <aside class="rail">
+      <div class="brand">
+        <span class="mark">Financing Desk</span>
+        <span class="tag">SLB · G-Sec repo · FTP</span>
+      </div>
 
-    <!-- Band 1: KPI strip. One card carries the accent; the rest are hairlines. -->
-    <section class="kpis" id="kpis" aria-label="Book summary">
-      <div class="kpi skeleton" style="height:112px"></div>
-      <div class="kpi skeleton" style="height:112px"></div>
-      <div class="kpi skeleton" style="height:112px"></div>
-      <div class="kpi skeleton" style="height:112px"></div>
-      <div class="kpi skeleton" style="height:112px"></div>
-      <div class="kpi skeleton" style="height:112px"></div>
-    </section>
+      <nav aria-label="Desk sections">
+        <a href="#sec-book">Book</a>
+        <a href="#sec-specialness">Specialness</a>
+        <a href="#sec-curves">Curves</a>
+        <a href="#sec-attribution">Attribution</a>
+        <a href="#sec-blotter">Blotter</a>
+      </nav>
 
-    <div class="row">
-      <!-- Band 2: specialness -->
-      <section class="panel span-7" id="sec-specialness">
-        <header>
-          <h2>Specialness</h2>
-          <span class="note">score by security &amp; tenor bucket · hatched = stale quote</span>
-        </header>
-        <div class="body">
-          <div class="heat" id="heat"><div class="skeleton block"></div></div>
-          <div class="legend">
-            <span>GC</span><span class="ramp"></span><span>hard to borrow</span>
-            <span class="spacer"></span>
-            <span>hover a cell for both score components</span>
+      <div class="foot">
+        Market data: NSE &amp; NSE Clearing, education only. The book is synthetic.<br>
+        Fees are ₹/share for the contract period, annualised ACT/365.<br><br>
+        <a href="/docs">API docs</a> · <a href="/api/data-coverage">coverage</a>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <div class="pagehead">
+        <h2 id="sec-book">Book overview</h2>
+        <span class="spacer"></span>
+        <span class="stamp">
+          <span class="dot" id="stamp-dot"></span>
+          <span id="stamp-text">end of day</span>
+          <strong id="stamp-date">…</strong>
+        </span>
+      </div>
+
+      <!-- KPI strip. One card carries the accent; the rest are hairlines. -->
+      <section class="kpis" id="kpis" aria-label="Book summary">
+        <div class="kpi skeleton" style="height:112px"></div>
+        <div class="kpi skeleton" style="height:112px"></div>
+        <div class="kpi skeleton" style="height:112px"></div>
+        <div class="kpi skeleton" style="height:112px"></div>
+        <div class="kpi skeleton" style="height:112px"></div>
+        <div class="kpi skeleton" style="height:112px"></div>
+      </section>
+
+      <div class="row">
+        <section class="panel span-7" id="sec-specialness">
+          <header>
+            <h3>Specialness</h3>
+            <span class="note">score by security &amp; tenor bucket · hatched = stale quote</span>
+          </header>
+          <div class="body">
+            <div class="heat" id="heat"><div class="skeleton block"></div></div>
+            <div class="legend">
+              <span>GC</span><span class="ramp"></span><span>hard to borrow</span>
+              <span class="spacer"></span>
+              <span>hover a cell for both score components</span>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Band 3: term structure -->
-      <section class="panel span-5" id="sec-curves">
+        <section class="panel span-5" id="sec-curves">
+          <header>
+            <h3>Fee term structure</h3>
+            <select id="ts-symbol" aria-label="Symbol for the term structure"></select>
+            <span class="spacer"></span>
+            <span class="note" id="ts-note"></span>
+          </header>
+          <div class="body">
+            <div class="chart-wrap"><canvas id="ts-canvas"></canvas></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="row">
+        <section class="panel span-5">
+          <header>
+            <h3>Funding curve</h3>
+            <span class="spacer"></span>
+            <span class="note" id="curve-note"></span>
+          </header>
+          <div class="body">
+            <div class="chart-wrap"><canvas id="curve-canvas"></canvas></div>
+          </div>
+        </section>
+
+        <section class="panel span-7" id="sec-attribution">
+          <header>
+            <h3>Desk &amp; treasury split</h3>
+            <span class="note">a matched book pays no FTP; a directional one pays for its balance sheet</span>
+          </header>
+          <div class="body">
+            <table>
+              <thead>
+                <tr>
+                  <th class="left">Desk</th><th>Pos</th><th>Gross</th><th>Net</th>
+                  <th>Fee</th><th>FTP</th><th>Desk spread</th><th>Treasury</th><th>Net</th>
+                </tr>
+              </thead>
+              <tbody id="desks"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel span-12" id="sec-blotter">
         <header>
-          <h2>Fee term structure</h2>
-          <select id="ts-symbol" aria-label="Symbol for the term structure"></select>
+          <h3>Blotter</h3>
+          <select id="bl-desk" aria-label="Filter by desk"></select>
+          <input type="search" id="bl-search" placeholder="symbol…" aria-label="Filter by symbol">
           <span class="spacer"></span>
-          <span class="note" id="ts-note"></span>
+          <span class="note" id="bl-count"></span>
         </header>
-        <div class="body">
-          <div class="chart-wrap"><canvas id="ts-canvas"></canvas></div>
-        </div>
-      </section>
-    </div>
-
-    <div class="row">
-      <!-- The curve the FTP model prices off -->
-      <section class="panel span-5">
-        <header>
-          <h2>Funding curve</h2>
-          <span class="spacer"></span>
-          <span class="note" id="curve-note"></span>
-        </header>
-        <div class="body">
-          <div class="chart-wrap"><canvas id="curve-canvas"></canvas></div>
-        </div>
-      </section>
-
-      <!-- The decomposition that has to add up -->
-      <section class="panel span-7" id="sec-attribution">
-        <header>
-          <h2>Desk &amp; treasury split</h2>
-          <span class="note">a matched book pays no FTP; a directional one pays for its balance sheet</span>
-        </header>
-        <div class="body">
+        <div class="table-scroll">
           <table>
             <thead>
               <tr>
-                <th class="left">Desk</th><th>Pos</th><th>Gross</th><th>Net</th>
-                <th>Fee</th><th>FTP</th><th>Desk spread</th><th>Treasury</th><th>Net</th>
+                <th class="left">Symbol</th><th class="left">Series</th><th class="left">Side</th>
+                <th>Qty</th><th>Notional</th><th>Tenor</th><th>Fee % p.a.</th>
+                <th>Special</th><th>FTP %</th><th>Fee ₹/day</th><th>FTP ₹/day</th>
               </tr>
             </thead>
-            <tbody id="desks"></tbody>
+            <tbody id="blotter"></tbody>
           </table>
         </div>
       </section>
-    </div>
 
-    <!-- Band 4: blotter -->
-    <section class="panel span-12" id="sec-blotter">
-      <header>
-        <h2>Blotter</h2>
-        <select id="bl-desk" aria-label="Filter by desk"></select>
-        <input type="search" id="bl-search" placeholder="symbol…" aria-label="Filter by symbol">
-        <span class="spacer"></span>
-        <span class="note" id="bl-count"></span>
-      </header>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th class="left">Symbol</th><th class="left">Series</th><th class="left">Side</th>
-              <th>Qty</th><th>Notional</th><th>Tenor</th><th>Fee % p.a.</th>
-              <th>Special</th><th>FTP %</th><th>Fee ₹/day</th><th>FTP ₹/day</th>
-            </tr>
-          </thead>
-          <tbody id="blotter"></tbody>
-        </table>
-      </div>
-    </section>
-
-  </main>
-</div>
+    </main>
+  </div>
+</section>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script type="module" src="js/app.js"></script>

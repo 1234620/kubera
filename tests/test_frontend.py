@@ -29,6 +29,48 @@ def test_there_is_no_build_step():
     assert not list(WEB.rglob("*.ts"))
 
 
+def test_the_globe_reads_its_colours_from_tokens():
+    """Canvas cannot read a CSS gradient, so it is the easiest place to smuggle a
+    hardcoded colour back in. It reads the tokens instead."""
+    globe = (WEB / "js" / "globe.js").read_text()
+    assert 'token("--accent")' in globe
+    assert 'token("--globe-core")' in globe
+
+    tokens = TOKENS.read_text()
+    for name in ("--globe-core", "--globe-mid", "--globe-edge"):
+        assert f"{name}:" in tokens, name
+
+
+def test_the_globe_data_is_local_and_attributed():
+    """No runtime dependency on a third-party tile server or texture host."""
+    land = WEB / "data" / "land.json"
+    assert land.is_file()
+    assert land.stat().st_size < 200_000
+
+    globe = (WEB / "js" / "globe.js").read_text()
+    assert "Natural Earth" in globe
+    assert "public" in globe.lower()
+    assert "http" not in globe  # the fetch is a relative path
+
+
+def test_the_globe_is_reachable_without_a_pointer():
+    """A drag-only object is unusable by keyboard, and it is the page's one
+    interactive ornament."""
+    globe = (WEB / "js" / "globe.js").read_text()
+    assert "keydown" in globe
+    assert "ArrowLeft" in globe
+    assert 'tabindex="0"' in INDEX.read_text()
+
+
+def test_the_hero_leads_with_a_verifiable_claim():
+    """The landing page's numbers are the ones the tests actually assert, not
+    marketing figures nobody can check."""
+    html = INDEX.read_text()
+    assert "132 / 133" in html
+    assert "0.000 bp" in html
+    assert "synthetic" in html  # the book's status is stated, not hidden
+
+
 def test_there_is_no_login_anywhere():
     """rules/FRONTEND.md: no auth page, ever. This runs on localhost."""
     banned = re.compile(r"\b(login|signin|sign-in|password|logout|jwt|bearer)\b", re.I)
@@ -72,12 +114,14 @@ def test_the_specialness_ramp_is_oklch():
 def test_the_palette_names_its_reference():
     """A design should be able to say where it came from.
 
-    tokens.css cites the Robinhood identity by Porto Rocha and carries its Robin
-    Neon value, rather than presenting colours nobody can account for.
+    tokens.css cites the Awwwards "Algorithmic Trading Dashboard" concept the
+    brief supplied as the target, and records that the brief asked for black and
+    white where the reference used black and blue -- which is the decision that
+    shaped the whole palette.
     """
     text = TOKENS.read_text()
-    assert "PORTO ROCHA" in text
-    assert "#CCFF00" in text or "#ccff00" in text
+    assert "Awwwards" in text
+    assert "BLACK + WHITE" in text
 
 
 def test_there_is_only_one_accent():
@@ -117,14 +161,16 @@ def test_the_motion_the_rules_require_is_present():
     lift and the motion is all purposeful: entry, draw-in, shimmer, alert.
     """
     css = (WEB / "css" / "app.css").read_text()
-    for keyframe in ("rise", "rowin", "fade", "shimmer", "called", "beat", "draw"):
+    for keyframe in ("rise", "rowin", "fade", "shimmer", "called", "beat", "breathe", "draw"):
         assert f"@keyframes {keyframe}" in css, keyframe
     assert "@keyframes drift" not in css
 
     # Gradients still do work -- surface depth, the rail, the specialness ramp,
-    # the skeleton sweep -- they just no longer shout.
+    # the skeleton sweep, the feather behind the hero copy -- they just no longer
+    # shout. Only one radial now: the drifting blobs are gone and the hero relies
+    # on the globe instead.
     assert css.count("linear-gradient") >= 6
-    assert css.count("radial-gradient") >= 2
+    assert css.count("radial-gradient") >= 1
 
 
 def test_only_allowed_cdns_are_referenced():
@@ -169,6 +215,21 @@ def test_every_nav_anchor_resolves():
     targets = set(re.findall(r'\bid="([^"]+)"', html))
     anchors = {a for a in re.findall(r'href="#([^"]+)"', html)}
     assert anchors <= targets, anchors - targets
+
+
+def test_the_hero_grid_track_is_constrained():
+    """`minmax(0, 1fr)`, never an implicit `auto` track.
+
+    An auto grid track sizes to MAX-CONTENT. The hero's stats grid wants four
+    118px columns, so the track resolved to 598px inside a 375px viewport and
+    overflow:hidden clipped the headline -- with no scrollbar and no console
+    error to give it away. scrollWidth even reported no overflow. This is the
+    canonical CSS grid blow-out and it is worth pinning down.
+    """
+    css = (WEB / "css" / "app.css").read_text()
+    hero = css[css.index(".hero {") :]
+    hero = hero[: hero.index("}")]
+    assert "grid-template-columns: minmax(0, 1fr)" in hero
 
 
 def test_numbers_are_tabular():

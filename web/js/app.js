@@ -5,6 +5,7 @@
 import { api } from "./api.js";
 import { bps, countUp, day, money, num, pct, qty, sign, signedMoney } from "./format.js";
 import { fundingCurveChart, sparkline, termStructureChart } from "./charts.js";
+import { mountGlobe } from "./globe.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -61,7 +62,7 @@ const KPI_CARDS = [
   },
   {
     label: "Specials",
-    tone: "var(--warn)",
+    tone: "var(--text-dim)",
     value: (k) => k.special_count,
     render: (v) => qty(Math.round(v)),
     series: "special_count",
@@ -70,7 +71,7 @@ const KPI_CARDS = [
   },
   {
     label: "Open margin calls",
-    tone: "var(--neg)",
+    tone: "var(--text-dim)",
     value: (k) => k.open_margin_calls,
     render: (v) => qty(Math.round(v)),
     series: "open_margin_calls",
@@ -170,7 +171,7 @@ function renderHeatmap() {
       // Below the ramp's midpoint the cell is dark, so dark-on-dark text would
       // fail contrast. Flip to the light text token instead of relying on one
       // ink colour across the whole scale.
-      const dark = row.specialness_score < 45 ? " low" : "";
+      const dark = row.specialness_score < 50 ? " low" : "";
       cells.push(
         `<div class="cell${dark}${row.is_stale ? " stale" : ""}" style="--i:${index};` +
           `background:${heatColour(row.specialness_score)}" title="${title}">` +
@@ -346,6 +347,10 @@ async function boot() {
     );
   }
 }
+
+// The globe is decorative, so it is mounted independently of the data load: a
+// failed fetch must not leave the landing page blank.
+mountGlobe($("globe"));
 
 // Filters are client-side over data already fetched, so changing one does not
 // hit the API. Only as_of and the term-structure symbol re-fetch.
