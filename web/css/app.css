@@ -833,6 +833,10 @@ tbody tr.called { animation: rowin .38s var(--ease) both, called 2.2s var(--ease
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
+    /* Zeroing the duration alone is not enough: the staggered reveals hold
+       their `from` state through `animation-delay` with `both` fill, so the
+       last blotter row would wait 300 x 40ms = 12s to appear. */
+    animation-delay: 0s !important;
   }
 }
 

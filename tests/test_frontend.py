@@ -147,6 +147,12 @@ def test_reduced_motion_is_honoured():
     css = (WEB / "css" / "app.css").read_text()
     assert "prefers-reduced-motion: reduce" in css
 
+    # Zeroing the duration is not enough. The staggered reveals hold their `from`
+    # state through animation-delay with `both` fill, so without this the last
+    # blotter row still waits 300 x 40ms = 12s to appear -- the animation is
+    # "off" and the content is still late.
+    assert "animation-delay: 0s !important" in css
+
     # And the count-up skips outright rather than animating fast.
     assert "prefers-reduced-motion" in (WEB / "js" / "format.js").read_text()
     assert "prefers-reduced-motion" in (WEB / "js" / "charts.js").read_text()

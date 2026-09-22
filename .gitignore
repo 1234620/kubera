@@ -16,3 +16,7 @@ data/processed/
 
 # Power BI: the .pbit template is committed, a .pbix with data is not.
 *.pbix
+
+# /brag output: a 3-minute walkthrough video plus its 2x screenshots, narration
+# WAVs and licensed music bed. Reproducible from brag-output/brag-plan.md.
+brag-output/
