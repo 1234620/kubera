@@ -9,8 +9,9 @@
 Named for the Hindu god of wealth and treasurer of the gods — and a nod to
 [E-Kuber](https://www.rbi.org.in/), the RBI's own auction and settlement platform.
 
+[![Live](https://img.shields.io/badge/live-1234620.github.io%2Fkubera-white?labelColor=07070a)](https://1234620.github.io/kubera/)
 [![CI](https://github.com/1234620/kubera/actions/workflows/ci.yml/badge.svg)](https://github.com/1234620/kubera/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-287%20passing-white?labelColor=07070a)](tests)
+[![Tests](https://img.shields.io/badge/tests-288%20passing-white?labelColor=07070a)](tests)
 [![Checked against NSE](https://img.shields.io/badge/yields%20vs%20NSE-132%2F133%20within%202bp-white?labelColor=07070a)](docs/03-domain-bond-math.md#11-validation-plan)
 [![Median error](https://img.shields.io/badge/median%20yield%20error-0.000%20bp-white?labelColor=07070a)](docs/03-domain-bond-math.md#11-validation-plan)
 
@@ -28,6 +29,10 @@ Named for the Hindu god of wealth and treasurer of the gods — and a nod to
 <div align="center">
 
 <img src="docs/assets/dashboard.svg" alt="The desk: KPI strip, specialness heatmap, desk and treasury attribution, blotter" width="100%">
+
+<sub><b><a href="https://1234620.github.io/kubera/">See it live →</a></b> &nbsp;·&nbsp; GitHub Pages serves files, not
+processes, so the public copy reads a committed snapshot of every API response
+(<code>scripts/snapshot_api.py</code>). Run it locally for the live database behind it.</sub>
 
 <sub>Both images above are animated SVGs, hand-built from the project's own data —
 the globe's coastlines are the same Natural Earth set the live page renders, and

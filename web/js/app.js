@@ -2,7 +2,7 @@
    Everything here formats and draws. Anything beyond a percentage belongs in
    SQL (rules/FRONTEND.md). */
 
-import { api } from "./api.js";
+import { api, isLive } from "./api.js";
 import { bps, countUp, day, money, num, pct, qty, sign, signedMoney } from "./format.js";
 import { fundingCurveChart, sparkline, termStructureChart } from "./charts.js";
 import { mountGlobe } from "./globe.js";
@@ -319,6 +319,21 @@ async function boot() {
 
     $("stamp-date").textContent = day(kpis.as_of_date);
     const dot = $("stamp-dot");
+
+    // On GitHub Pages there is no FastAPI behind the page, so /docs and the
+    // coverage endpoint would 404 and the numbers are a frozen snapshot. Say
+    // both, and send the links to the files in the repository instead.
+    if (!(await isLive())) {
+      $("stamp-text").textContent = "static snapshot ·";
+      const docs = "https://github.com/1234620/kubera/blob/main/docs/08-api-spec.md";
+      document.querySelectorAll('a[href^="/docs"], a[href^="/api/"]').forEach((link) => {
+        // An /api link has a snapshot file; /docs is FastAPI's own generated
+        // page, which only exists where FastAPI is running.
+        const path = link.getAttribute("href").replace("/api/", "");
+        link.href = link.getAttribute("href") === "/docs" ? docs : `data/snapshot/${path}.json`;
+        link.rel = "noreferrer";
+      });
+    }
     if (!kpis.ftp_reconciles) {
       dot.classList.add("bad");
       $("stamp-text").textContent = "FTP does not reconcile";

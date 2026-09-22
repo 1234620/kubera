@@ -248,3 +248,21 @@ def test_numbers_are_tabular():
     """Columns of digits have to line up to be scannable."""
     css = (WEB / "css" / "app.css").read_text()
     assert "font-variant-numeric: tabular-nums" in css
+
+
+def test_every_endpoint_the_frontend_calls_has_a_snapshot():
+    """GitHub Pages runs no Python, so the published copy reads static JSON.
+
+    A wrapper in api.js without a matching file under web/data/snapshot works
+    perfectly on localhost and breaks only on the public site, which is exactly
+    the failure nobody notices. scripts/snapshot_api.py regenerates them.
+    """
+    paths = re.findall(r'get\("(/[^"]+)"', (WEB / "js" / "api.js").read_text())
+    assert paths, "api.js no longer routes through get()"
+
+    missing = [
+        path
+        for path in paths
+        if not (WEB / "data" / "snapshot" / f"{path.strip('/').replace('/', '-')}.json").is_file()
+    ]
+    assert not missing, missing

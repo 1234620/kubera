@@ -33,6 +33,7 @@ open http://localhost:8000
 | `seed` | Generate the synthetic book from real quotes. Idempotent; truncates and regenerates. Seeded, so it reproduces |
 | `analytics` | Refresh derived tables, then run every validation query |
 | `test` | Full suite in the container, so the Postgres tests run. `test-local` runs on the host and skips them |
+| `snapshot` | Rewrite `web/data/snapshot/*.json` from the running API, so the public GitHub Pages copy shows current numbers |
 | `readme-svgs` | Regenerate the animated README images from the project's own data |
 | `test-ci` | Reproduces CI: a throwaway database holding only the committed fixtures. Use this before pushing — a suite that passes against a full backfill can still fail in CI, because tests that need history must skip rather than assume it |
 | `lint` | `ruff check` and `ruff format --check` |
@@ -97,6 +98,34 @@ Attribution. Measures are defined in the model, and `powerbi/measures.md` lists
 each DAX measure against the SQL metric it mirrors — so the two never drift
 silently.
 
+## Publishing the public copy
+
+The page is published at <https://1234620.github.io/kubera/> by
+[`.github/workflows/pages.yml`](../.github/workflows/pages.yml), which uploads
+`web/` unchanged on every push to `main` that touches it. There is no build step
+to run.
+
+GitHub Pages serves files, not processes, so there is no FastAPI and no Postgres
+behind the public page. Instead every response the dashboard reads is committed
+as static JSON under `web/data/snapshot/`, and `web/js/api.js` probes
+`/api/health` once at boot: if nothing answers it reads the snapshot instead of
+the API. Nothing else in the frontend knows the difference, and the page says
+`static snapshot` in its date stamp so the numbers are not mistaken for live
+ones.
+
+The snapshot is a build output that is deliberately committed, because CI has
+neither NSE's files nor a loaded database and so cannot regenerate it. Refresh it
+from a loaded local stack after new data lands:
+
+```bash
+make up && make ingest && make seed && make analytics
+make snapshot            # rewrites web/data/snapshot/*.json  (~826 KB)
+git add web/data/snapshot && git commit -m "chore(web): refresh the snapshot"
+```
+
+`tests/test_frontend.py` fails if an endpoint wrapper in `api.js` has no matching
+snapshot file — that break would otherwise only appear on the public site.
+
 ## CI
 
 `.github/workflows/ci.yml`:
@@ -124,3 +153,5 @@ passes, and CI failing always means *our* code broke.
 | Dashboard shows `—` for utilisation | `lendable_qty` estimate missing for that symbol | Expected for newly eligible names; the cell is labelled as an estimate |
 | FTP reconciliation test fails | A position has no curve point at its tenor | Check `GET /api/ftp/curve` for a gap; the interpolator should not have one |
 | Migration checksum mismatch | An applied migration was edited | Revert it and add a new migration |
+| Public page shows stale numbers | The snapshot was not refreshed after ingesting | `make snapshot` and commit `web/data/snapshot/` |
+| Public page shows "Could not load" | A snapshot file is missing for an endpoint | `make snapshot`; `pytest tests/test_frontend.py` names the gap |

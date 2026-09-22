@@ -1,4 +1,4 @@
-.PHONY: up down logs migrate ingest ingest-date seed analytics test lint psql reset help
+.PHONY: up down logs migrate ingest ingest-date seed analytics snapshot test lint psql reset help
 .DEFAULT_GOAL := help
 
 DAYS ?= 30
@@ -39,6 +39,9 @@ test: ## Run the full suite (in the container, so the database tests run too)
 
 test-local: ## Run pytest on the host (database tests skip)
 	pytest -q
+
+snapshot: ## Refresh the static JSON the public GitHub Pages copy reads
+	python scripts/snapshot_api.py
 
 readme-svgs: ## Regenerate the animated README images
 	python scripts/build_readme_svgs.py
